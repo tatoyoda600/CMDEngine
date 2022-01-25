@@ -350,7 +350,7 @@ namespace cmde
 
 	#pragma region DrawFunctions
 		//Simply modifies the value of the specified position in the screen array
-	#pragma region Draw
+		#pragma region Draw
 						/// <summary>
 						/// Draws to a specific point on the command prompt
 						/// </summary>
@@ -370,7 +370,7 @@ namespace cmde
 			void Draw(float x, float y, short col = 0x000F, short cha = 0x2588) { Draw((short)x, (short)y, col, cha); }
 							/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="p">The position of the point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param>
 			void Draw(VEC2F p, short col = 0x000F, short cha = 0x2588) { Draw((short)p.x, (short)p.y, col, cha); }
-	#pragma endregion
+		#pragma endregion
 
 		//Gets the step size for the reaction in 1 axis when moving 1 unit in the other
 		//	by going from point 1 to point 2 like this in both axis, you can find every space through which the line crosses
@@ -378,7 +378,7 @@ namespace cmde
 		//	after the first movement in each axis, the movements can be by 1 unit
 		//If the points are whole numbers, the first step can be skipped due to knowing that the points will always be exactly in a space
 		//Using relative screen space for the points is the same as normal, but with the added step of converting the coordinates first
-	#pragma region DrawLine
+		#pragma region DrawLine
 						/// <summary>
 						/// Draws a line on the command pront from a point to another point
 						/// </summary>
@@ -412,12 +412,12 @@ namespace cmde
 			void DrawLineS(float x1, float y1, float x2, float y2, short col = 0x000F, short cha = 0x2588) { DrawLine(ScreenPosToPoint(x1, y1), ScreenPosToPoint(x2, y2), col, cha); }
 							/// <summary>Draws a line on the command pront from a point in relative screen space to another point in relative screen space</summary> /// <param name="p1">The position of the first point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="p2">The position of the second point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param>
 			void DrawLineS(VEC2F p1, VEC2F p2, short col = 0x000F, short cha = 0x2588) { DrawLine(ScreenPosToPoint(p1), ScreenPosToPoint(p2), col, cha); }
-	#pragma endregion
+		#pragma endregion
 
 		//Uses trigonometry to get the vertices of a regular polygon of 'edges' sides and then connects them with lines
 		//Using relative screen space for the polygon requires the conversion of the center point and the radius
 		//	but due to the radius not being a point, it must be defined relative to the width or height of the screen
-	#pragma region DrawRPoly
+		#pragma region DrawRPoly
 						/// <summary>
 						/// Draws a regular polygon to the screen
 						/// </summary>
@@ -443,7 +443,7 @@ namespace cmde
 			void DrawRPolyS(float cx, float cy, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588) { DrawRPoly(ScreenPosToPoint(cx, cy), edges, (useY ? ScreenPosToPoint(0, rad).y : ScreenPosToPoint(rad, 0).x), rot, col, cha); }
 							/// <summary>Draws a regular polygon to the screen using relative screen space</summary> /// <param name="p">The position of the center of the polygon in relative screen space</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices in relative screen space</param> /// <param name="useY">Whether the radius' size is defined by the screen's height or width ('true' means height is used; 'false' for width)</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param>
 			void DrawRPolyS(VEC2F p, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588) { DrawRPolyS(p.x, p.y, edges, rad, useY, rot, col, cha); }
-	#pragma endregion
+		#pragma endregion
 	#pragma endregion
 
 						/// <summary>
