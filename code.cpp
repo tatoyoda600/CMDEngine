@@ -213,7 +213,7 @@ namespace cmde
 			}
 
 			//Setting up the console window (Not entirely sure about what everything here does, had to copy most of it due to the complexity)
-#pragma region ConsoleWindowSetup
+	#pragma region ConsoleWindowSetup
 			//Creates an object that then basically functions as the console
 			console = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 			//Gets a reference to the input handler
@@ -315,10 +315,10 @@ namespace cmde
 				ThrowError(L"SetConsoleWindowInfo");
 				return;
 			}
-#pragma endregion
+	#pragma endregion
 			
 			//Gets a reference to the program window and changes some settings
-#pragma region WindowSettings
+	#pragma region WindowSettings
 			//Sets the title of the program to something random in order to distinguish it from the other programs on the computer
 			int temp = rand();
 			swprintf(_msg, 128, L"%d", temp);
@@ -329,7 +329,7 @@ namespace cmde
 			//Changes the window's settings (Prevents maximizing, minimizing, and resizing)
 			SetWindowLongPtrW(window, GWL_STYLE, WS_OVERLAPPEDWINDOW & ~(WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SIZEBOX));
 			::SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_SHOWWINDOW | SWP_NOSIZE | SWP_NOREPOSITION);
-#pragma endregion
+	#pragma endregion
 		}
 
 						/// <summary>
@@ -348,9 +348,9 @@ namespace cmde
 		bool OnScreen(short x, short y) { return (x >= 0 && y >= 0 && x < screenSize.X && y < screenSize.Y); }
 			bool OnScreen(VEC2F p) { return (p.x >= 0 && p.y >= 0 && p.x < screenSize.X && p.y < screenSize.Y); }
 
-#pragma region DrawFunctions
+	#pragma region DrawFunctions
 		//Simply modifies the value of the specified position in the screen array
-#pragma region Draw
+	#pragma region Draw
 						/// <summary>
 						/// Draws to a specific point on the command prompt
 						/// </summary>
@@ -370,7 +370,7 @@ namespace cmde
 			void Draw(float x, float y, short col = 0x000F, short cha = 0x2588) { Draw((short)x, (short)y, col, cha); }
 							/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="p">The position of the point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param>
 			void Draw(VEC2F p, short col = 0x000F, short cha = 0x2588) { Draw((short)p.x, (short)p.y, col, cha); }
-#pragma endregion
+	#pragma endregion
 
 		//Gets the step size for the reaction in 1 axis when moving 1 unit in the other
 		//	by going from point 1 to point 2 like this in both axis, you can find every space through which the line crosses
@@ -378,7 +378,7 @@ namespace cmde
 		//	after the first movement in each axis, the movements can be by 1 unit
 		//If the points are whole numbers, the first step can be skipped due to knowing that the points will always be exactly in a space
 		//Using relative screen space for the points is the same as normal, but with the added step of converting the coordinates first
-#pragma region DrawLine
+	#pragma region DrawLine
 						/// <summary>
 						/// Draws a line on the command pront from a point to another point
 						/// </summary>
@@ -412,12 +412,12 @@ namespace cmde
 			void DrawLineS(float x1, float y1, float x2, float y2, short col = 0x000F, short cha = 0x2588) { DrawLine(ScreenPosToPoint(x1, y1), ScreenPosToPoint(x2, y2), col, cha); }
 							/// <summary>Draws a line on the command pront from a point in relative screen space to another point in relative screen space</summary> /// <param name="p1">The position of the first point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="p2">The position of the second point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param>
 			void DrawLineS(VEC2F p1, VEC2F p2, short col = 0x000F, short cha = 0x2588) { DrawLine(ScreenPosToPoint(p1), ScreenPosToPoint(p2), col, cha); }
-#pragma endregion
+	#pragma endregion
 
 		//Uses trigonometry to get the vertices of a regular polygon of 'edges' sides and then connects them with lines
 		//Using relative screen space for the polygon requires the conversion of the center point and the radius
 		//	but due to the radius not being a point, it must be defined relative to the width or height of the screen
-#pragma region DrawRPoly
+	#pragma region DrawRPoly
 						/// <summary>
 						/// Draws a regular polygon to the screen
 						/// </summary>
@@ -443,8 +443,8 @@ namespace cmde
 			void DrawRPolyS(float cx, float cy, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588) { DrawRPoly(ScreenPosToPoint(cx, cy), edges, (useY ? ScreenPosToPoint(0, rad).y : ScreenPosToPoint(rad, 0).x), rot, col, cha); }
 							/// <summary>Draws a regular polygon to the screen using relative screen space</summary> /// <param name="p">The position of the center of the polygon in relative screen space</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices in relative screen space</param> /// <param name="useY">Whether the radius' size is defined by the screen's height or width ('true' means height is used; 'false' for width)</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param>
 			void DrawRPolyS(VEC2F p, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588) { DrawRPolyS(p.x, p.y, edges, rad, useY, rot, col, cha); }
-#pragma endregion
-#pragma endregion
+	#pragma endregion
+	#pragma endregion
 
 						/// <summary>
 						/// Converts a relative screen space position ('0.0 - 1.0' is 'Left - Right' or 'Top - Bottom') to a point in the pixel grid ('0.0 - screenSize.X' is 'Left - Right' and '0.0 - screenSize.Y' is 'Top - Bottom')
@@ -488,7 +488,7 @@ namespace cmde
 			_pixelCount = screenWidth * screenHeight;
 			screen = new CHAR_INFO[pixelCount];
 			//Setting up the console window (Not entirely sure about what everything here does, had to copy most of it due to the complexity)
-#pragma region ConsoleWindowSetup
+	#pragma region ConsoleWindowSetup
 			//Creates an object that then basically functions as the console
 			console = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 			//Set the window size to the smallest possible
@@ -588,7 +588,7 @@ namespace cmde
 				ThrowError(L"SetConsoleWindowInfo");
 				return;
 			}
-#pragma endregion
+	#pragma endregion
 		}
 
 		//Used the same name as a function in 'Windows.h', this is horrible practice
@@ -778,7 +778,7 @@ namespace cmde
 
 
 		//General useful functions
-#pragma region MiscFunctions
+	#pragma region MiscFunctions
 		float Pow2(float f)
 		{
 			return f * f;
@@ -805,7 +805,7 @@ namespace cmde
 		{
 			return v / Magnitude(v);
 		}
-#pragma region LinearFunction
+	#pragma region LinearFunction
 						/// <summary>Calculates the y value of point x on the line defined by the 2 points provided (Returns y1 if x1 == x2)</summary>
 		float LinearFunction(float x1, float y1, float x2, float y2, float x)
 		{
@@ -845,7 +845,7 @@ namespace cmde
 			bool LinearFunction(float x1, float y1, float x2, float y2, LINEAR* output) { if (x1 == x2) { return false; } *output = LinearFunction(x1, y1, x2, y2); return true; }
 							/// <summary>Generates the linear function based on 'x' defined by the 2 points provided and inserts it into 'output' (Returns false if p1.x == p2.x)</summary>
 			bool LinearFunction(VEC4F p1, VEC4F p2, LINEAR* output) { if (p1.x == p2.x) { return false; } *output = LinearFunction(p1, p2); return true; }
-#pragma endregion
+	#pragma endregion
 
 						/// <summary>Calculates the point at 'x' on the line defined by the 3 points provided and inserts it into 'output' (Returns false if there is any repeat value in p1.x, p2.x, and p3.x)<summary>
 		bool QuadraticFunction(VEC2F p1, VEC2F p2, VEC2F p3, float x, VEC2F* output)
@@ -889,7 +889,7 @@ namespace cmde
 		{
 			return { sin(h * RAD) * cos(v * RAD), sin(v * RAD), cos(h * RAD) * cos(v * RAD) };
 		}
-#pragma endregion
+	#pragma endregion
 	};
 }
 
