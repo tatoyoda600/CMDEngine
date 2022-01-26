@@ -1119,6 +1119,8 @@ public:
 
 	void Setup()
 	{
+		/* 
+		//1x1x1 Cube
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 } });
 		shape.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 } });
 		shape.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 } });
@@ -1131,6 +1133,21 @@ public:
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 } });
 		shape.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 } });
 		shape.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 } });
+		*/
+
+		//1x20x1 Pole
+		shape.AddTriangle({ { 0, -10, 0 }, { 0, 10, 0 }, { 1, -10, 0 } });
+		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, -10, 0 } });
+		shape.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 } });
+		shape.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 } });
+		shape.AddTriangle({ { 1, -10, 0 }, { 1, 10, 0 }, { 1, -10, 1 } });
+		shape.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, -10, 1 } });
+		shape.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 } });
+		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 } });
+		shape.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 10, 1 } });
+		shape.AddTriangle({ { 0, -10, 0 }, { 0, 10, 1 }, { 0, 10, 0 } });
+		shape.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 10, 1 } });
+		shape.AddTriangle({ { 0, -10, 1 }, { 1, 10, 1 }, { 0, 10, 1 } });
 	}
 
 	void Update()
@@ -1165,12 +1182,12 @@ public:
 
 			cmde::VEC3F slr = forwards * DotProduct(sightLimitL, forwards) - left * DotProduct(sightLimitL, left);
 			cmde::VEC3F slb = forwards * DotProduct(sightLimitT, forwards) - up * DotProduct(sightLimitT, up);
-			//cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(left, sightLimitT), CrossProduct(up, slr), CrossProduct(slb, left) };
-			cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(up, slr) };
+			cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(left, sightLimitT), CrossProduct(up, slr), CrossProduct(slb, left) };
+			//cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(up, slr) };
 			//Near and far planes too
 
 			//std::vector<Triangle> newTriangles = shape.triangles;
-			std::vector<Triangle> newTriangles = ClipTriangles(2, shape.triangles, pos, inBounds);
+			std::vector<Triangle> newTriangles = ClipTriangles(4, shape.triangles, pos, inBounds);
 			for (Triangle t : newTriangles)
 			{
 				cmde::VEC2F vertices[3];
@@ -1178,6 +1195,9 @@ public:
 				{
 					if (myRenderingSystem == true)
 					{
+						//Vertical rendering is kinda messed up
+						//When rotating vertically, it seems like you're also rotating in another direction
+						//Stuff ends up going to the left and right despite it only being vertical
 						DrawLine({ 0, 0 }, { 2, 0 });
 						DrawLine({ 0, 2 }, { 2, 2 });
 						DrawLine({ 0, 4 }, { 2, 4 });
@@ -1233,8 +1253,36 @@ public:
 		sightLimitL = VectorFromAngles(facing.x + fov.x * 0.5f, facing.y);
 		sightLimitT = VectorFromAngles(facing.x, facing.y + fov.y * 0.5f);
 		forwards = VectorFromAngles(facing.x, facing.y);   //  0,  0,  1
-		left = VectorFromAngles(facing.x + 90, facing.y);  //  1,  0,  0
-		up = VectorFromAngles(facing.x, facing.y + 90);    //  0,  1,  0
+		left = VectorFromAngles(facing.x + 90, 0);  //  1,  0,  0
+		up = VectorFromAngles(0, facing.y + 90);    //  0,  1,  0
+		//up = CrossProduct(forwards, left);
+		wchar_t print[128];
+		int tempCounter = swprintf(print, 128, L"H: %f | V: %f", facing.x, facing.y);
+		for (int i = 0; i < tempCounter; i++)
+		{
+			Draw(i, (short)0, 0x000F, print[i]);
+		}
+		tempCounter = swprintf(print, 128, L"(%f, %f, %f)", forwards.x, forwards.y, forwards.z);
+		for (int i = 0; i < tempCounter; i++)
+		{
+			Draw(i, (short)1, 0x000F, print[i]);
+		}
+		tempCounter = swprintf(print, 128, L"(%f, %f, %f)", left.x, left.y, left.z);
+		for (int i = 0; i < tempCounter; i++)
+		{
+			Draw(i, (short)2, 0x000F, print[i]);
+		}
+		tempCounter = swprintf(print, 128, L"(%f, %f, %f)", up.x, up.y, up.z);
+		for (int i = 0; i < tempCounter; i++)
+		{
+			Draw(i, (short)3, 0x000F, print[i]);
+		}
+		cmde::VEC3F crossProductR = CrossProduct(forwards, left);
+		tempCounter = swprintf(print, 128, L"(%f, %f, %f)", crossProductR.x, crossProductR.y, crossProductR.z);
+		for (int i = 0; i < tempCounter; i++)
+		{
+			Draw(i, (short)4, 0x000F, print[i]);
+		}
 	}
 };
 
