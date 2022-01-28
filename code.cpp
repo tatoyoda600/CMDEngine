@@ -892,11 +892,13 @@ namespace cmde
 						/// <summary>Assumes the XYZ axis are set up correctly (X+ is left when Z+ is forwards and Y+ is up)</summary>
 		VEC3F VectorFromAngles(float h, float v)
 		{
-			//return { sin(h * RAD) * cos(v * RAD), sin(v * RAD), cos(h * RAD) * cos(v * RAD) };
+			return { sin(h * RAD) * cos(v * RAD), sin(v * RAD), cos(h * RAD) * cos(v * RAD) };
+			/*
 			v = 90 - v;
 			v = fmod(abs(v), 360.0f) + (v < 0 ? 360 : 0);
 			h = fmod(abs(h), 360.0f) + (h < 0 ? 360 : 0);
 			return { sin(h * RAD) * sin(v * RAD), cos(v * RAD), cos(h * RAD) * sin(v * RAD) };
+			*/
 		}
 	#pragma endregion
 	};
@@ -1156,7 +1158,23 @@ public:
 		shape.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 } });
 		*/
 
+		/*
 		//1x20x1 Pole
+		shape.AddTriangle({ { 0, -10, 0 }, { 0, 10, 0 }, { 1, -10, 0 } });
+		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, -10, 0 } });
+		shape.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 } });
+		shape.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 } });
+		shape.AddTriangle({ { 1, -10, 0 }, { 1, 10, 0 }, { 1, -10, 1 } });
+		shape.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, -10, 1 } });
+		shape.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 } });
+		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 } });
+		shape.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 10, 1 } });
+		shape.AddTriangle({ { 0, -10, 0 }, { 0, 10, 1 }, { 0, 10, 0 } });
+		shape.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 10, 1 } });
+		shape.AddTriangle({ { 0, -10, 1 }, { 1, 10, 1 }, { 0, 10, 1 } });
+		*/
+
+		//2x 1x10x1 Pole
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 10, 0 }, { 1, 0, 0 } });
 		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, 0, 0 } });
 		shape.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 } });
@@ -1309,6 +1327,7 @@ public:
 		sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 
+		/*
 		tempCounter = swprintf(print, 128, L"X: %f | Y: %f | Z: %f", pos.x, pos.y, pos.z);
 		WriteText(0, 0, print, tempCounter);
 		tempCounter = swprintf(print, 128, L"H: %f | V: %f", facing.x, facing.y);
@@ -1325,6 +1344,7 @@ public:
 		cmde::VEC3F slr = forwards * DotProduct(sightLimitL, forwards) - left * DotProduct(sightLimitL, left);
 		tempCounter = swprintf(print, 128, L"slr: (%f, %f, %f)", slr.x, slr.y, slr.z);
 		WriteText(0, 5, print, tempCounter);
+		*/
 	}
 };
 
