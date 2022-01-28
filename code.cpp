@@ -1136,7 +1136,7 @@ public:
 		//X+ is left when Z+ is forwards and Y+ is up
 		forwards = VectorFromAngles(facing.x, facing.y);	//  0,  0,  1
 		left = VectorFromAngles(facing.x + 90, 0);			//  1,  0,  0
-		up = VectorFromAngles(0, facing.y + 90);			//  0,  1,  0
+		up = VectorFromAngles(facing.x, facing.y + 90);		//  0,  1,  0
 		sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		myRenderingSystem = false;
@@ -1325,7 +1325,7 @@ public:
 		//X+ is left when Z+ is forwards and Y+ is up
 		forwards = VectorFromAngles(facing.x, facing.y);	//  0,  0,  1
 		left = VectorFromAngles(facing.x + 90, 0);			//  1,  0,  0
-		up = VectorFromAngles(facing.x, facing.y + 90);			//  0,  1,  0
+		up = VectorFromAngles(facing.x, facing.y + 90);		//  0,  1,  0
 		sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 
