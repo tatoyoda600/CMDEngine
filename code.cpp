@@ -1068,10 +1068,12 @@ class Test3D : public cmde::CMDEngine
 				oob[i] = !oob[i];
 			}
 		}
+		short o = 0;
 		for (short i = 0; i < 3; i++)
 		{
 			if (oob[i] == true)
 			{
+				o = i;
 				g = t.vertices[i];
 				g1 = t.vertices[(i + 1) % 3];
 				g2 = t.vertices[(i + 2) % 3];
@@ -1090,11 +1092,11 @@ class Test3D : public cmde::CMDEngine
 			//nothing
 			break;
 		case 1:
-			output.push_back(Triangle(new1, g1, g2, true, true, false));
-			output.push_back(Triangle(new1, g2, new2, false, true, false));
+			output.push_back(Triangle(new1, g1, g2, true && t.visibleSides[o], true && t.visibleSides[(o + 1) % 3], false));
+			output.push_back(Triangle(new1, g2, new2, false, true && t.visibleSides[(o + 2) % 3], false));
 			break;
 		case 2:
-			output.push_back(Triangle(g, new1, new2, true, false, true));
+			output.push_back(Triangle(g, new1, new2, true && t.visibleSides[o], false, true && t.visibleSides[(o + 2) % 3]));
 			break;
 		}
 		return output;
@@ -1323,7 +1325,7 @@ public:
 		//X+ is left when Z+ is forwards and Y+ is up
 		forwards = VectorFromAngles(facing.x, facing.y);	//  0,  0,  1
 		left = VectorFromAngles(facing.x + 90, 0);			//  1,  0,  0
-		up = VectorFromAngles(0, facing.y + 90);			//  0,  1,  0
+		up = VectorFromAngles(facing.x, facing.y + 90);			//  0,  1,  0
 		sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 
@@ -1340,10 +1342,10 @@ public:
 		WriteText(0, 4, print, tempCounter);
 
 		tempCounter = swprintf(print, 128, L"sll: (%f, %f, %f)", sightLimitL.x, sightLimitL.y, sightLimitL.z);
-		WriteText(0, 4, print, tempCounter);
+		WriteText(0, 5, print, tempCounter);
 		cmde::VEC3F slr = forwards * DotProduct(sightLimitL, forwards) - left * DotProduct(sightLimitL, left);
 		tempCounter = swprintf(print, 128, L"slr: (%f, %f, %f)", slr.x, slr.y, slr.z);
-		WriteText(0, 5, print, tempCounter);
+		WriteText(0, 6, print, tempCounter);
 		*/
 	}
 };
