@@ -155,7 +155,7 @@ namespace cmde
 		bool autoClearScreen;
 		wchar_t title[256];
 		float fpsLimit;
-		/// <summary>0 -> nothing ; 1 -> released ; 2 -> pressed ; 3+ -> held (for n-2 frames)</summary>
+		/// <summary>0 -> nothing ; 1 -> released ; 2 -> pressed ; 3 -> held ; MOUSE_X & MOUSE_Y -> point on the command prompt</summary>
 		std::map<wchar_t, short> inputs;
 
 						/// <summary>
@@ -444,6 +444,22 @@ namespace cmde
 							/// <summary>Draws a regular polygon to the screen using relative screen space</summary> /// <param name="p">The position of the center of the polygon in relative screen space</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices in relative screen space</param> /// <param name="useY">Whether the radius' size is defined by the screen's height or width ('true' means height is used; 'false' for width)</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param>
 			void DrawRPolyS(VEC2F p, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588) { DrawRPolyS(p.x, p.y, edges, rad, useY, rot, col, cha); }
 		#pragma endregion
+
+						/// <summary>
+						/// Writes a line of text starting from a point on the command prompt
+						/// </summary>
+						/// <param name="x">The x position of the leftmost character</param>
+						/// <param name="y">The y position on which to write the line</param>
+						/// <param name="text">The text to write</param>
+						/// <param name="length">The amount of characters in the text</param>
+						/// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param>
+		void WriteText(short x, short y, wchar_t *text, int length, short col = 0x000F)
+		{
+			for (int i = 0; i < length; i++)
+			{
+				Draw(i + x, (short)y, 0x000F, text[i]);
+			}
+		}
 	#pragma endregion
 
 						/// <summary>
@@ -631,7 +647,7 @@ namespace cmde
 			SetConsoleTitle(tmp);
 		}
 
-						/// <summary>0 -> nothing ; 1 -> released ; 2 -> pressed ; 3+ -> held (for n-2 frames)</summary>
+						/// <summary>0 -> nothing ; 1 -> released ; 2 -> pressed ; 3 -> held ; MOUSE_X & MOUSE_Y -> point on the command prompt</summary>
 		void ReadInputs()
 		{
 			short tx = inputs[MOUSE_X];
@@ -675,18 +691,7 @@ namespace cmde
 						continue;
 					}
 
-					k->second++;
-					if (buf.Event.KeyEvent.bKeyDown == false)
-					{
-						k->second = 1;
-					}
-					else
-					{
-						if (k->second == 1)
-						{
-							k->second = 2;
-						}
-					}
+					k->second = (buf.Event.KeyEvent.bKeyDown == false ? 1 :(k->second <= 1 ? 2 : 3));
 
 					if (buf.Event.KeyEvent.dwControlKeyState > 0)
 					{
@@ -887,7 +892,11 @@ namespace cmde
 						/// <summary>Assumes the XYZ axis are set up correctly (X+ is left when Z+ is forwards and Y+ is up)</summary>
 		VEC3F VectorFromAngles(float h, float v)
 		{
-			return { sin(h * RAD) * cos(v * RAD), sin(v * RAD), cos(h * RAD) * cos(v * RAD) };
+			//return { sin(h * RAD) * cos(v * RAD), sin(v * RAD), cos(h * RAD) * cos(v * RAD) };
+			v = 90 - v;
+			v = fmod(abs(v), 360.0f) + (v < 0 ? 360 : 0);
+			h = fmod(abs(h), 360.0f) + (h < 0 ? 360 : 0);
+			return { sin(h * RAD) * sin(v * RAD), cos(v * RAD), cos(h * RAD) * sin(v * RAD) };
 		}
 	#pragma endregion
 	};
@@ -945,12 +954,26 @@ class Test3D : public cmde::CMDEngine
 	struct Triangle
 	{
 		cmde::VEC3F vertices[3];
+		bool visibleSides[3];
 
 		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3)
 		{
 			vertices[0] = p1;
 			vertices[1] = p2;
 			vertices[2] = p3;
+			visibleSides[0] = true;
+			visibleSides[1] = true;
+			visibleSides[2] = true;
+		}
+
+		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3, bool s1, bool s2, bool s3)
+		{
+			vertices[0] = p1;
+			vertices[1] = p2;
+			vertices[2] = p3;
+			visibleSides[0] = s1;
+			visibleSides[1] = s2;
+			visibleSides[2] = s3;
 		}
 	};
 
@@ -1065,30 +1088,28 @@ class Test3D : public cmde::CMDEngine
 			//nothing
 			break;
 		case 1:
-			output.push_back(Triangle(new1, g1, g2));
-			output.push_back(Triangle(new1, g2, new2));
+			output.push_back(Triangle(new1, g1, g2, true, true, false));
+			output.push_back(Triangle(new1, g2, new2, false, true, false));
 			break;
 		case 2:
-			output.push_back(Triangle(g, new1, new2));
+			output.push_back(Triangle(g, new1, new2, true, false, true));
 			break;
 		}
 		return output;
 	}
 
-	//-------------------------------------------------------------------------------------
-	//OLC projection matrix thing
+
 	cmde::VEC3F ProjectionMatrixify(cmde::VEC3F v)
 	{
 		float fov = 90.0f;
 		float f = 1.0f / tanf(fov * 0.5f * RAD);
-		float zf = 1000.0f; // far plane
-		float zn = 0.1f; // near plane
+		float farPlane = 1000.0f;
+		float nearPlane = 0.1f;
 		v.z = -v.z; //This thing uses - distance for depth, but since I use + distance everywhere else, this tiny change is necessary
 		if (v.z != 0)
-			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / v.z, (f * v.y) / v.z, ((v.z - zn) * (zf / (zf - zn))) / v.z };
-		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y), ((v.z - zn) * (zf / (zf - zn))) };
+			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / v.z, (f * v.y) / v.z, ((v.z - nearPlane) * (farPlane / (farPlane - nearPlane))) / v.z };
+		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y), ((v.z - nearPlane) * (farPlane / (farPlane - nearPlane))) };
 	}
-	//-------------------------------------------------------------------------------------
 
 public:
 	Mesh shape;
@@ -1109,11 +1130,11 @@ public:
 		fov = { 90, 90 };
 		facing = { 0, 0 };
 		//X+ is left when Z+ is forwards and Y+ is up
-		sightLimitL = VectorFromAngles(facing.x + fov.x * 0.5f, facing.y);
-		sightLimitT = VectorFromAngles(facing.x, facing.y + fov.y * 0.5f);
-		forwards = VectorFromAngles(facing.x, facing.y);   //  0,  0,  1
-		left = VectorFromAngles(facing.x + 90, facing.y);  //  1,  0,  0
-		up = VectorFromAngles(facing.x, facing.y + 90);    //  0,  1,  0
+		forwards = VectorFromAngles(facing.x, facing.y);	//  0,  0,  1
+		left = VectorFromAngles(facing.x + 90, 0);			//  1,  0,  0
+		up = VectorFromAngles(0, facing.y + 90);			//  0,  1,  0
+		sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
+		sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		myRenderingSystem = false;
 	}
 
@@ -1136,22 +1157,37 @@ public:
 		*/
 
 		//1x20x1 Pole
-		shape.AddTriangle({ { 0, -10, 0 }, { 0, 10, 0 }, { 1, -10, 0 } });
-		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, -10, 0 } });
-		shape.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 } });
-		shape.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 } });
-		shape.AddTriangle({ { 1, -10, 0 }, { 1, 10, 0 }, { 1, -10, 1 } });
-		shape.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, -10, 1 } });
+		shape.AddTriangle({ { 0, 0, 0 }, { 0, 10, 0 }, { 1, 0, 0 } });
+		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, 0, 0 } });
+		shape.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 } });
+		shape.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 } });
+		shape.AddTriangle({ { 1, 0, 0 }, { 1, 10, 0 }, { 1, 0, 1 } });
+		shape.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, 0, 1 } });
 		shape.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 } });
 		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 } });
-		shape.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 10, 1 } });
-		shape.AddTriangle({ { 0, -10, 0 }, { 0, 10, 1 }, { 0, 10, 0 } });
-		shape.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 10, 1 } });
-		shape.AddTriangle({ { 0, -10, 1 }, { 1, 10, 1 }, { 0, 10, 1 } });
+		shape.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 10, 1 } });
+		shape.AddTriangle({ { 0, 0, 0 }, { 0, 10, 1 }, { 0, 10, 0 } });
+		shape.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 10, 1 } });
+		shape.AddTriangle({ { 0, 0, 1 }, { 1, 10, 1 }, { 0, 10, 1 } });
+
+		shape.AddTriangle({ { 0, -10, 0 }, { 0, 0, 0 }, { 1, -10, 0 } });
+		shape.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 1, -10, 0 } });
+		shape.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 } });
+		shape.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 } });
+		shape.AddTriangle({ { 1, -10, 0 }, { 1, 0, 0 }, { 1, -10, 1 } });
+		shape.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 1, -10, 1 } });
+		shape.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 1, 0, 1 } });
+		shape.AddTriangle({ { 0, 0, 0 }, { 1, 0, 1 }, { 1, 0, 0 } });
+		shape.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 0, 1 } });
+		shape.AddTriangle({ { 0, -10, 0 }, { 0, 0, 1 }, { 0, 0, 0 } });
+		shape.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 0, 1 } });
+		shape.AddTriangle({ { 0, -10, 1 }, { 1, 0, 1 }, { 0, 0, 1 } });
 	}
 
 	void Update()
 	{
+		wchar_t print[128];
+		int tempCounter;
 		cmde::VEC3F offset = shape.center - pos;
 		if (DotProduct(forwards, offset) > 0)
 		{
@@ -1180,8 +1216,8 @@ public:
 			*/
 			
 
-			cmde::VEC3F slr = forwards * DotProduct(sightLimitL, forwards) - left * DotProduct(sightLimitL, left);
-			cmde::VEC3F slb = forwards * DotProduct(sightLimitT, forwards) - up * DotProduct(sightLimitT, up);
+			cmde::VEC3F slr = left * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
+			cmde::VEC3F slb = up * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 			cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(left, sightLimitT), CrossProduct(up, slr), CrossProduct(slb, left) };
 			//cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(up, slr) };
 			//Near and far planes too
@@ -1209,6 +1245,23 @@ public:
 						hTemp = hTemp + left * DotProduct(temp, left);
 						float hAngle = Angle(hTemp, sightLimitL);
 						float vAngle = Angle(vTemp, sightLimitT);
+
+						/*
+						tempCounter = swprintf(print, 128, L"temp: (%f, %f, %f)", temp.x, temp.y, temp.z);
+						WriteText(0, 5, print, tempCounter);
+						tempCounter = swprintf(print, 128, L"hTemp: (%f, %f, %f)", hTemp.x, hTemp.y, hTemp.z);
+						WriteText(0, 6, print, tempCounter);
+						tempCounter = swprintf(print, 128, L"vTemp: (%f, %f, %f)", vTemp.x, vTemp.y, vTemp.z);
+						WriteText(0, 7, print, tempCounter);
+
+						tempCounter = swprintf(print, 128, L"(%f, %f, %f)", sightLimitL.x, sightLimitL.y, sightLimitL.z);
+						WriteText(0, 5, print, tempCounter);
+						tempCounter = swprintf(print, 128, L"%f°)", Angle(hTemp, sightLimitL));
+						WriteText(0, 6, print, tempCounter);
+						tempCounter = swprintf(print, 128, L"(%f, %f, %f)", hTemp.x, hTemp.y, hTemp.z);
+						WriteText(0, 7, print, tempCounter);
+						*/
+
 						vertices[i] = ScreenPosToPoint((hAngle / fov.x) * (DotProduct(CrossProduct(hTemp, sightLimitL), up) > 0 ? 1 : -1), (vAngle / fov.y) * (-DotProduct(CrossProduct(vTemp, sightLimitT), left) > 0 ? 1 : -1));
 					}
 					else
@@ -1223,11 +1276,11 @@ public:
 					}
 				}
 				short color = (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) < 0 ? 0x00EE : 0x00BB);
-				//if (OnScreen(vertices[0]) && OnScreen(vertices[1]))
+				if (t.visibleSides[0] == true)
 					DrawLine(vertices[0], vertices[1], color);
-				//if (OnScreen(vertices[1]) && OnScreen(vertices[2]))
+				if (t.visibleSides[1] == true)
 					DrawLine(vertices[1], vertices[2], color);
-				//if (OnScreen(vertices[2]) && OnScreen(vertices[0]))
+				if (t.visibleSides[2] == true)
 					DrawLine(vertices[2], vertices[0], color);
 			}
 
@@ -1250,39 +1303,28 @@ public:
 		facing.y += (inputs[MOUSE_Y] < 50 ? 0.2f : 0); // top
 
 		//X+ is left when Z+ is forwards and Y+ is up
-		sightLimitL = VectorFromAngles(facing.x + fov.x * 0.5f, facing.y);
-		sightLimitT = VectorFromAngles(facing.x, facing.y + fov.y * 0.5f);
-		forwards = VectorFromAngles(facing.x, facing.y);   //  0,  0,  1
-		left = VectorFromAngles(facing.x + 90, 0);  //  1,  0,  0
-		up = VectorFromAngles(0, facing.y + 90);    //  0,  1,  0
-		//up = CrossProduct(forwards, left);
-		wchar_t print[128];
-		int tempCounter = swprintf(print, 128, L"H: %f | V: %f", facing.x, facing.y);
-		for (int i = 0; i < tempCounter; i++)
-		{
-			Draw(i, (short)0, 0x000F, print[i]);
-		}
-		tempCounter = swprintf(print, 128, L"(%f, %f, %f)", forwards.x, forwards.y, forwards.z);
-		for (int i = 0; i < tempCounter; i++)
-		{
-			Draw(i, (short)1, 0x000F, print[i]);
-		}
-		tempCounter = swprintf(print, 128, L"(%f, %f, %f)", left.x, left.y, left.z);
-		for (int i = 0; i < tempCounter; i++)
-		{
-			Draw(i, (short)2, 0x000F, print[i]);
-		}
-		tempCounter = swprintf(print, 128, L"(%f, %f, %f)", up.x, up.y, up.z);
-		for (int i = 0; i < tempCounter; i++)
-		{
-			Draw(i, (short)3, 0x000F, print[i]);
-		}
-		cmde::VEC3F crossProductR = CrossProduct(forwards, left);
-		tempCounter = swprintf(print, 128, L"(%f, %f, %f)", crossProductR.x, crossProductR.y, crossProductR.z);
-		for (int i = 0; i < tempCounter; i++)
-		{
-			Draw(i, (short)4, 0x000F, print[i]);
-		}
+		forwards = VectorFromAngles(facing.x, facing.y);	//  0,  0,  1
+		left = VectorFromAngles(facing.x + 90, 0);			//  1,  0,  0
+		up = VectorFromAngles(0, facing.y + 90);			//  0,  1,  0
+		sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
+		sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
+
+		tempCounter = swprintf(print, 128, L"X: %f | Y: %f | Z: %f", pos.x, pos.y, pos.z);
+		WriteText(0, 0, print, tempCounter);
+		tempCounter = swprintf(print, 128, L"H: %f | V: %f", facing.x, facing.y);
+		WriteText(0, 1, print, tempCounter);
+		tempCounter = swprintf(print, 128, L"forwards: (%f, %f, %f)", forwards.x, forwards.y, forwards.z);
+		WriteText(0, 2, print, tempCounter);
+		tempCounter = swprintf(print, 128, L"left: (%f, %f, %f)", left.x, left.y, left.z);
+		WriteText(0, 3, print, tempCounter);
+		tempCounter = swprintf(print, 128, L"up: (%f, %f, %f)", up.x, up.y, up.z);
+		WriteText(0, 4, print, tempCounter);
+
+		tempCounter = swprintf(print, 128, L"sll: (%f, %f, %f)", sightLimitL.x, sightLimitL.y, sightLimitL.z);
+		WriteText(0, 4, print, tempCounter);
+		cmde::VEC3F slr = forwards * DotProduct(sightLimitL, forwards) - left * DotProduct(sightLimitL, left);
+		tempCounter = swprintf(print, 128, L"slr: (%f, %f, %f)", slr.x, slr.y, slr.z);
+		WriteText(0, 5, print, tempCounter);
 	}
 };
 
