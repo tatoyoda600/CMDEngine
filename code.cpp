@@ -1289,11 +1289,6 @@ public:
 						*/
 
 						vertices[i] = ScreenPosToPoint((hAngle / fov.x), (vAngle / fov.y));
-						if (isnan(vertices[i].x))
-						{
-							tempCounter = swprintf(print, 128, L"acos(%f) * DEG", DotProduct(hTemp, sightLimitL) / (Magnitude(sightLimitL) * Magnitude(hTemp)));
-							WriteText(0, i, print, tempCounter);
-						}
 					}
 					else
 					{
@@ -1314,8 +1309,8 @@ public:
 				if (t.visibleSides[2] == true)
 					DrawLine(vertices[2], vertices[0], color);
 
-				tempCounter = swprintf(print, 128, L"(%f, %f)", vertices[0].x, vertices[0].y);
-				WriteText((vertices[0].x > 0 ? vertices[0].x : 0), vertices[0].y - 1, print, tempCounter);
+				//tempCounter = swprintf(print, 128, L"(%f, %f)", vertices[0].x, vertices[0].y);
+				//WriteText((vertices[0].x > 0 ? vertices[0].x : 0), vertices[0].y - 1, print, tempCounter);
 			}
 		}
 
