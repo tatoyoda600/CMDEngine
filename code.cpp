@@ -1352,6 +1352,7 @@ public:
 			{
 				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) > 0)
 				{
+					//Backface culling
 					continue;
 				}
 				cmde::VEC2F vertices[3];
