@@ -54,6 +54,7 @@ namespace cmde
 		VEC4F operator* (const VEC4F& a) { return VEC4F(x * a.x, y * a.y, z * a.z, w * a.w); }
 		VEC4F operator+ (const VEC4F& a) { return VEC4F(x + a.x, y + a.y, z + a.z, w + a.w); }
 		VEC4F operator- (const VEC4F& a) { return VEC4F(x - a.x, y - a.y, z - a.z, w - a.w); }
+		bool operator== (const VEC4F& a) { return (x == a.x && y == a.y && z == a.z && w == a.w); }
 	};
 	struct VEC3F : public VEC4F
 	{
@@ -800,11 +801,14 @@ namespace cmde
 		{
 			return sqrt(abs(DotProduct(v, v)));
 		}
+		float Clamp(float v, float lo, float hi)
+		{
+			return v < lo ? lo : hi < v ? hi : v;
+		}
 						/// <summary>Calculates the angle between 2 vectors in degrees</summary>
 		float Angle(VEC4F v1, VEC4F v2)
 		{
-			return acos(DotProduct(v1, v2) / (Magnitude(v2) * Magnitude(v1))) * DEG;
-			
+			return acos(Clamp(DotProduct(v1, v2) / (Magnitude(v2) * Magnitude(v1)), -1.0f, 1.0f)) * DEG;
 		}
 		VEC4F Normalize(VEC4F v)
 		{
@@ -1144,7 +1148,7 @@ public:
 
 	void Setup()
 	{
-		/* 
+		///* 
 		//1x1x1 Cube
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 } });
 		shape.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 } });
@@ -1158,7 +1162,7 @@ public:
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 } });
 		shape.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 } });
 		shape.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 } });
-		*/
+		//*/
 
 		/*
 		//1x20x1 Pole
@@ -1176,6 +1180,7 @@ public:
 		shape.AddTriangle({ { 0, -10, 1 }, { 1, 10, 1 }, { 0, 10, 1 } });
 		*/
 
+		/*
 		//2x 1x10x1 Pole
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 10, 0 }, { 1, 0, 0 } });
 		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, 0, 0 } });
@@ -1202,6 +1207,7 @@ public:
 		shape.AddTriangle({ { 0, -10, 0 }, { 0, 0, 1 }, { 0, 0, 0 } });
 		shape.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 0, 1 } });
 		shape.AddTriangle({ { 0, -10, 1 }, { 1, 0, 1 }, { 0, 0, 1 } });
+		*/
 	}
 
 	void Update()
@@ -1282,7 +1288,12 @@ public:
 						WriteText(0, 7, print, tempCounter);
 						*/
 
-						vertices[i] = ScreenPosToPoint((hAngle / fov.x) * (DotProduct(CrossProduct(hTemp, sightLimitL), up) > 0 ? 1 : -1), (vAngle / fov.y) * (-DotProduct(CrossProduct(vTemp, sightLimitT), left) > 0 ? 1 : -1));
+						vertices[i] = ScreenPosToPoint((hAngle / fov.x), (vAngle / fov.y));
+						if (isnan(vertices[i].x))
+						{
+							tempCounter = swprintf(print, 128, L"acos(%f) * DEG", DotProduct(hTemp, sightLimitL) / (Magnitude(sightLimitL) * Magnitude(hTemp)));
+							WriteText(0, i, print, tempCounter);
+						}
 					}
 					else
 					{
@@ -1302,8 +1313,10 @@ public:
 					DrawLine(vertices[1], vertices[2], color);
 				if (t.visibleSides[2] == true)
 					DrawLine(vertices[2], vertices[0], color);
-			}
 
+				tempCounter = swprintf(print, 128, L"(%f, %f)", vertices[0].x, vertices[0].y);
+				WriteText((vertices[0].x > 0 ? vertices[0].x : 0), vertices[0].y - 1, print, tempCounter);
+			}
 		}
 
 		pos = pos + forwards * (inputs[L'w'] >= 2 ? 0.005f : 0);
