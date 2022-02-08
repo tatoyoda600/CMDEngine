@@ -461,6 +461,85 @@ namespace cmde
 				Draw(i + x, (short)y, 0x000F, text[i]);
 			}
 		}
+
+		void DrawTriangle(VEC2F v1, VEC2F v2, VEC2F v3, short col = 0x000F, short cha = 0x2588)
+		{
+			VEC2F list[3] = { VEC2F((short)v1.x, (short)v1.y), VEC2F((short)v2.x, (short)v2.y), VEC2F((short)v3.x, (short)v3.y) };
+			for (short i = 0; i < 3; i++)
+			{
+				if (list[i].y < list[0].y)
+				{
+					std::swap(list[i], list[0]);
+				}
+				if (list[i].y > list[2].y)
+				{
+					std::swap(list[i], list[2]);
+				}
+			}
+			VEC2F b1, b2, t1;
+			if (list[0].y == list[2].y)
+			{
+				//Line
+				DrawLine(list[0], list[1], col, cha);
+				DrawLine(list[1], list[2], col, cha);
+			}
+			else
+			{
+				if (list[0].y == list[1].y)
+				{
+					b1 = list[0];
+					b2 = list[1];
+					t1 = list[2];
+				}
+				else
+				{
+					if (list[1].y == list[2].y)
+					{
+						b1 = list[1];
+						b2 = list[2];
+						t1 = list[0];
+					}
+					else
+					{
+						//Turn into 2 triangles with a flat side and then pass them both through this function
+						b1 = list[1];
+						b2 = VEC2F(LinearFunction(list[0].y, list[0].x, list[2].y, list[2].x, b1.y), b1.y);
+						DrawTriangle(list[0], b1, b2, col, cha);
+						DrawTriangle(b1, b2, list[2], col, cha);
+						return;
+					}
+				}
+			}
+			//The 'DrawLine()' code but slightly modified so that 2 lines can be done at once
+			//If you draw 2 lines to the same point, both starting at the same Y level and filling in the space between them every time the Y level changes
+			//then you've drawn a triangle
+			short ux1 = (b1.x < t1.x ? 1 : -1), ux2 = (b2.x < t1.x ? 1 : -1), uy = (b1.y < t1.y ? 1 : -1);
+			float tx1 = t1.x - b1.x, tx2 = t1.x - b2.x, ty = t1.y - b1.y;
+			float sx1 = (ty != 0 ? ux1 * abs(tx1 / ty) : 0), sy1 = (tx1 != 0 ? uy * abs(ty / tx1) : 0), sx2 = (ty != 0 ? ux2 * abs(tx2 / ty) : 0), sy2 = (tx2 != 0 ? uy * abs(ty / tx2) : 0);
+			DrawLine(b1.x, b1.y, b2.x, b2.y, col, cha);
+			Draw(t1.x, t1.y, col, cha);
+			tx1 = fmod(ux1 - fmod(b1.x, 1.0f), 1.0f);
+			tx2 = fmod(ux2 - fmod(b2.x, 1.0f), 1.0f);
+			ty = fmod(uy - fmod(b1.y, 1.0f), 1.0f);
+
+			/*
+			//+1 on x for line 1 & +? on y for line 1
+			for (float x = b1.x + tx1, y = b1.y + uy * abs(tx1 * sy1); x * ux1 < t1.x * ux1; x += ux1, y += sy1)
+			{
+				Draw(x, y, col, cha);
+			}
+			//+1 on x for line 2 & +? on y for line 2
+			for (float x = b2.x + tx2, y = b2.y + uy * abs(tx2 * sy2); x * ux2 < t1.x * ux2; x += ux2, y += sy2)
+			{
+				Draw(x, y, col, cha);
+			}
+			*/
+			//+1 on y for line 1 & 2, & +? on x for line 1 & 2
+			for (float y = b1.y + ty, x1 = b1.x + ux1 * abs(ty * sx1), x2 = b2.x + ux2 * abs(ty * sx2); y * uy < t1.y * uy; y += uy, x1 += sx1, x2 += sx2)
+			{
+				DrawLine(x1, y, x2, y, col, cha);
+			}
+		}
 	#pragma endregion
 
 						/// <summary>
@@ -1130,6 +1209,7 @@ public:
 	cmde::VEC3F left;
 	cmde::VEC3F up;
 	bool myRenderingSystem;
+	bool wireframe;
 
 	Test3D(short screenWidth, short screenHeight, short fontWidth, short fontHeight) : cmde::CMDEngine(screenWidth, screenHeight, fontWidth, fontHeight, true, true, FPS60)
 	{
@@ -1144,11 +1224,29 @@ public:
 		sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		myRenderingSystem = false;
+		wireframe = false;
+		emptyChar.Attributes = 0x0088;
 	}
 
 	void Setup()
 	{
 		///* 
+		//1x1x1 Cube (with outline)
+		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, true, false, true });
+		shape.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 }, true, true, false });
+		shape.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, true, false, true });
+		shape.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, true, true, false });
+		shape.AddTriangle({ { 1, 0, 0 }, { 1, 1, 0 }, { 1, 0, 1 }, true, false, true });
+		shape.AddTriangle({ { 1, 1, 0 }, { 1, 1, 1 }, { 1, 0, 1 }, true, true, false });
+		shape.AddTriangle({ { 0, 1, 0 }, { 0, 1, 1 }, { 1, 1, 1 }, true, true, false });
+		shape.AddTriangle({ { 0, 1, 0 }, { 1, 1, 1 }, { 1, 1, 0 }, false, true, true });
+		shape.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 1 }, true, true, false });
+		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 }, false, true, true });
+		shape.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, true, true, false });
+		shape.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 }, false, true, true });
+		//*/
+
+		/* 
 		//1x1x1 Cube
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 } });
 		shape.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 } });
@@ -1162,7 +1260,7 @@ public:
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 } });
 		shape.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 } });
 		shape.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 } });
-		//*/
+		*/
 
 		/*
 		//1x20x1 Pole
@@ -1212,8 +1310,8 @@ public:
 
 	void Update()
 	{
-		wchar_t print[128];
-		int tempCounter;
+		wchar_t print[128] = {};
+		int tempCounter = 0;
 		cmde::VEC3F offset = shape.center - pos;
 		if (DotProduct(forwards, offset) > 0)
 		{
@@ -1252,6 +1350,10 @@ public:
 			std::vector<Triangle> newTriangles = ClipTriangles(4, shape.triangles, pos, inBounds);
 			for (Triangle t : newTriangles)
 			{
+				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) > 0)
+				{
+					continue;
+				}
 				cmde::VEC2F vertices[3];
 				for (int i = 0; i < 3; i++)
 				{
@@ -1301,13 +1403,26 @@ public:
 						vertices[i] = (ProjectionMatrixify(temp) + cmde::VEC3F(1, 1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
 					}
 				}
-				short color = (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) < 0 ? 0x00EE : 0x00BB);
-				if (t.visibleSides[0] == true)
-					DrawLine(vertices[0], vertices[1], color);
-				if (t.visibleSides[1] == true)
-					DrawLine(vertices[1], vertices[2], color);
-				if (t.visibleSides[2] == true)
-					DrawLine(vertices[2], vertices[0], color);
+				if (wireframe == true)
+				{
+					short color = (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) < 0 ? 0x00EE : 0x00BB);
+					if (t.visibleSides[0] == true)
+						DrawLine(vertices[0], vertices[1], color);
+					if (t.visibleSides[1] == true)
+						DrawLine(vertices[1], vertices[2], color);
+					if (t.visibleSides[2] == true)
+						DrawLine(vertices[2], vertices[0], color);
+				}
+				else
+				{
+					if (t.visibleSides[0] == true)
+						DrawLine(vertices[0], vertices[1], 0x0000);
+					if (t.visibleSides[1] == true)
+						DrawLine(vertices[1], vertices[2], 0x0000);
+					if (t.visibleSides[2] == true)
+						DrawLine(vertices[2], vertices[0], 0x0000);
+					DrawTriangle(vertices[0], vertices[1], vertices[2]);
+				}
 
 				//tempCounter = swprintf(print, 128, L"(%f, %f)", vertices[0].x, vertices[0].y);
 				//WriteText((vertices[0].x > 0 ? vertices[0].x : 0), vertices[0].y - 1, print, tempCounter);
@@ -1318,8 +1433,8 @@ public:
 		pos = pos + left * (inputs[L'a'] >= 2 ? 0.005f : 0);
 		pos = pos + forwards * (inputs[L's'] >= 2 ? -0.005f : 0);
 		pos = pos + left * (inputs[L'd'] >= 2 ? -0.005f : 0);
-		pos = pos + up * (inputs[L'q'] >= 2 ? 0.005f : 0);
-		pos = pos + up * (inputs[L'e'] >= 2 ? -0.005f : 0);
+		pos = pos + up * (inputs[L'q'] >= 2 ? -0.005f : 0);
+		pos = pos + up * (inputs[L'e'] >= 2 ? 0.005f : 0);
 		if (inputs[L'r'] == 2)
 		{
 			myRenderingSystem = !myRenderingSystem;
