@@ -464,8 +464,8 @@ namespace cmde
 
 		void DrawTriangle(VEC2F v1, VEC2F v2, VEC2F v3, short col = 0x000F, short cha = 0x2588)
 		{
-			VEC2F list[3] = { VEC2F((short)v1.x, (short)v1.y), VEC2F((short)v2.x, (short)v2.y), VEC2F((short)v3.x, (short)v3.y) };
-			for (short i = 0; i < 3; i++)
+			VEC2F list[3] = { VEC2F(v1.x, v1.y), VEC2F(v2.x, v2.y), VEC2F(v3.x, v3.y) };
+			for (short i = 0; i < 2; i++)
 			{
 				if (list[i].y < list[0].y)
 				{
@@ -477,7 +477,7 @@ namespace cmde
 				}
 			}
 			VEC2F b1, b2, t1;
-			if (list[0].y == list[2].y)
+			if ((short)list[0].y == (short)list[2].y)
 			{
 				//Line
 				DrawLine(list[0], list[1], col, cha);
@@ -485,7 +485,7 @@ namespace cmde
 			}
 			else
 			{
-				if (list[0].y == list[1].y)
+				if ((short)list[0].y == (short)list[1].y)
 				{
 					b1 = list[0];
 					b2 = list[1];
@@ -493,7 +493,7 @@ namespace cmde
 				}
 				else
 				{
-					if (list[1].y == list[2].y)
+					if ((short)list[1].y == (short)list[2].y)
 					{
 						b1 = list[1];
 						b2 = list[2];
@@ -976,12 +976,6 @@ namespace cmde
 		VEC3F VectorFromAngles(float h, float v)
 		{
 			return { sin(h * RAD) * cos(v * RAD), sin(v * RAD), cos(h * RAD) * cos(v * RAD) };
-			/*
-			v = 90 - v;
-			v = fmod(abs(v), 360.0f) + (v < 0 ? 360 : 0);
-			h = fmod(abs(h), 360.0f) + (h < 0 ? 360 : 0);
-			return { sin(h * RAD) * sin(v * RAD), cos(v * RAD), cos(h * RAD) * sin(v * RAD) };
-			*/
 		}
 	#pragma endregion
 	};
@@ -1350,7 +1344,7 @@ public:
 			std::vector<Triangle> newTriangles = ClipTriangles(4, shape.triangles, pos, inBounds);
 			for (Triangle t : newTriangles)
 			{
-				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) > 0)
+				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - pos) > 0)
 				{
 					//Backface culling
 					continue;
