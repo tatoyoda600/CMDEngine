@@ -522,7 +522,6 @@ namespace cmde
 			tx2 = fmod(ux2 - fmod(b2.x, 1.0f), 1.0f);
 			ty = fmod(uy - fmod(b1.y, 1.0f), 1.0f);
 
-			/*
 			//+1 on x for line 1 & +? on y for line 1
 			for (float x = b1.x + tx1, y = b1.y + uy * abs(tx1 * sy1); x * ux1 < t1.x * ux1; x += ux1, y += sy1)
 			{
@@ -533,7 +532,6 @@ namespace cmde
 			{
 				Draw(x, y, col, cha);
 			}
-			*/
 			//+1 on y for line 1 & 2, & +? on x for line 1 & 2
 			for (float y = b1.y + ty, x1 = b1.x + ux1 * abs(ty * sx1), x2 = b2.x + ux2 * abs(ty * sx2); y * uy < t1.y * uy; y += uy, x1 += sx1, x2 += sx2)
 			{
@@ -1354,9 +1352,6 @@ public:
 				{
 					if (myRenderingSystem == true)
 					{
-						//Vertical rendering is kinda messed up
-						//When rotating vertically, it seems like you're also rotating in another direction
-						//Stuff ends up going to the left and right despite it only being vertical
 						DrawLine({ 0, 0 }, { 2, 0 });
 						DrawLine({ 0, 2 }, { 2, 2 });
 						DrawLine({ 0, 4 }, { 2, 4 });
