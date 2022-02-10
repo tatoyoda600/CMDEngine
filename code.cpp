@@ -15,6 +15,7 @@
 #define FPS30 0.03333333f
 #define insertws swprintf
 #define formatws swprintf
+#define appendVector vector.insert(vector.end(), addedVector.begin(), addedVector.end())
 #define RALT 0xF001
 #define LALT 0xF002
 #define RCTRL 0xF003
@@ -146,16 +147,18 @@ namespace cmde
 		COORD _screenSize;
 		int _pixelCount;
 		float _deltaTime;
+		CHAR_INFO* screen;
 	public:
 		const COORD& screenSize = _screenSize;
 		const int& pixelCount = _pixelCount;
 		const float& deltaTime = _deltaTime;
-		CHAR_INFO* screen;
 		bool running;
 		CHAR_INFO emptyChar;
 		bool autoClearScreen;
 		wchar_t title[256];
 		float fpsLimit;
+		float* zBuffer;
+		float farPlane;
 		/// <summary>0 -> nothing ; 1 -> released ; 2 -> pressed ; 3 -> held ; MOUSE_X & MOUSE_Y -> point on the command prompt</summary>
 		std::map<wchar_t, short> inputs;
 
@@ -176,6 +179,7 @@ namespace cmde
 			_pixelCount = screenWidth * screenHeight;
 			autoClearScreen = clearScreen;
 			running = true;
+			farPlane = 1000.0f;
 			if (fontWidth > 30 || fontHeight > 30)
 			{
 				ThrowError(L"FontTooBig (30)");
@@ -187,6 +191,7 @@ namespace cmde
 				return;
 			}
 			screen = new CHAR_INFO[_pixelCount];
+			zBuffer = new float[pixelCount];
 			_deltaTime = 0;
 			emptyChar.Char.UnicodeChar = 0x2588;
 			emptyChar.Attributes = 0x0000;
@@ -359,18 +364,20 @@ namespace cmde
 						/// <param name="y">The y position of the point (Topmost is 0; Bottommost is screenSize.Y)</param>
 						/// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param>
 						/// <param name="cha">The character with which to draw to that point</param>
-		void Draw(short x, short y, short col = 0x000F, short cha = 0x2588)
+						/// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+			void Draw(short x, short y, short col = 0x000F, short cha = 0x2588, float depth = -1)
 		{
-			if (OnScreen(x, y))
+			if (OnScreen(x, y) && (depth < 0 || (depth >= 0 && depth < zBuffer[y * screenSize.X + x])))
 			{
 				screen[y * screenSize.X + x].Char.UnicodeChar = cha;
 				screen[y * screenSize.X + x].Attributes = col;
+				zBuffer[y * screenSize.X + x] = depth;
 			}
 		}
-							/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="x">The x position of the point (Leftmost is 0; Rightmost is screenSize.X)</param> /// <param name="y">The y position of the point (Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param>
-			void Draw(float x, float y, short col = 0x000F, short cha = 0x2588) { Draw((short)x, (short)y, col, cha); }
-							/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="p">The position of the point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param>
-			void Draw(VEC2F p, short col = 0x000F, short cha = 0x2588) { Draw((short)p.x, (short)p.y, col, cha); }
+							/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="x">The x position of the point (Leftmost is 0; Rightmost is screenSize.X)</param> /// <param name="y">The y position of the point (Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+			void Draw(float x, float y, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)x, (short)y, col, cha, depth); }
+							/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="p">The position of the point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+			void Draw(VEC2F p, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)p.x, (short)p.y, col, cha, depth); }
 		#pragma endregion
 
 		//Gets the step size for the reaction in 1 axis when moving 1 unit in the other
@@ -381,7 +388,7 @@ namespace cmde
 		//Using relative screen space for the points is the same as normal, but with the added step of converting the coordinates first
 		#pragma region DrawLine
 						/// <summary>
-						/// Draws a line on the command pront from a point to another point
+						/// Draws a line on the command prompt from a point to another point
 						/// </summary>
 						/// <param name="x1">The x position of the first point (Leftmost is 0; Rightmost is screenSize.X)</param>
 						/// <param name="y1">The y position of the first point (Topmost is 0; Bottommost is screenSize.Y)</param>
@@ -389,30 +396,32 @@ namespace cmde
 						/// <param name="y2">The y position of the second point (Topmost is 0; Bottommost is screenSize.Y)</param>
 						/// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param>
 						/// <param name="cha">The character with which to draw the line</param>
-		void DrawLine(float x1, float y1, float x2, float y2, short col = 0x000F, short cha = 0x2588)
+						/// <param name="depth1">How far away from the camera the first point is (For rendering things on top of each other) (Negative values are always drawn)</param>
+						/// <param name="depth2">How far away from the camera the second point is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void DrawLine(float x1, float y1, float x2, float y2, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1)
 		{
 			short ux = (x1 < x2 ? 1 : -1), uy = (y1 < y2 ? 1 : -1);
 			float tx = x2 - x1, ty = y2 - y1;
 			float sx = (ty != 0 ? ux * abs(tx / ty) : 0), sy = (tx != 0 ? uy * abs(ty / tx) : 0);
-			Draw(x1, y1, col, cha);
-			Draw(x2, y2, col, cha);
+			Draw(x1, y1, col, cha, depth1);
+			Draw(x2, y2, col, cha, depth2);
 			tx = fmod(ux - fmod(x1, 1.0f), 1.0f);
 			ty = fmod(uy - fmod(y1, 1.0f), 1.0f);
 			for (float x = x1 + tx, y = y1 + uy * abs(tx * sy); x * ux < x2 * ux; x += ux, y += sy)
 			{
-				Draw(x, y, col, cha);
+				Draw(x, y, col, cha, LinearFunction(x1, depth1, x2, depth2, x));
 			}
 			for (float y = y1 + ty, x = x1 + ux * abs(ty * sx); y * uy < y2 * uy; y += uy, x += sx)
 			{
-				Draw(x, y, col, cha);
+				Draw(x, y, col, cha, LinearFunction(y1, depth1, y2, depth2, y));
 			}
 		}
-							/// <summary>Draws a line on the command pront from a point to another point</summary> /// <param name="p1">The position of the first point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="p2">The position of the second point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param>
-			void DrawLine(VEC2F p1, VEC2F p2, short col = 0x000F, short cha = 0x2588) { DrawLine(p1.x, p1.y, p2.x, p2.y, col, cha); }
-							/// <summary>Draws a line on the command pront from a point in relative screen space to another point in relative screen space</summary> /// <param name="x1">The x position of the first point in relative screen space (Leftmost is 0.0; Rightmost is 1.0)</param> /// <param name="y1">The y position of the first point in relative screen space (Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="x2">The x position of the second point in relative screen space (Leftmost is 0.0; Rightmost is 1.0)</param> /// <param name="y2">The y position of the second point in relative screen space (Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param>
-			void DrawLineS(float x1, float y1, float x2, float y2, short col = 0x000F, short cha = 0x2588) { DrawLine(ScreenPosToPoint(x1, y1), ScreenPosToPoint(x2, y2), col, cha); }
-							/// <summary>Draws a line on the command pront from a point in relative screen space to another point in relative screen space</summary> /// <param name="p1">The position of the first point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="p2">The position of the second point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param>
-			void DrawLineS(VEC2F p1, VEC2F p2, short col = 0x000F, short cha = 0x2588) { DrawLine(ScreenPosToPoint(p1), ScreenPosToPoint(p2), col, cha); }
+							/// <summary>Draws a line on the command pront from a point to another point</summary> /// <param name="p1">The position of the first point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="p2">The position of the second point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param> /// <param name="depth1">How far away from the camera the first point is (For rendering things on top of each other) (Negative values are always drawn)</param> /// <param name="depth2">How far away from the camera the second point is (For rendering things on top of each other) (Negative values are always drawn)</param>
+			void DrawLine(VEC2F p1, VEC2F p2, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1) { DrawLine(p1.x, p1.y, p2.x, p2.y, col, cha, depth1, depth2); }
+							/// <summary>Draws a line on the command pront from a point in relative screen space to another point in relative screen space</summary> /// <param name="x1">The x position of the first point in relative screen space (Leftmost is 0.0; Rightmost is 1.0)</param> /// <param name="y1">The y position of the first point in relative screen space (Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="x2">The x position of the second point in relative screen space (Leftmost is 0.0; Rightmost is 1.0)</param> /// <param name="y2">The y position of the second point in relative screen space (Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param> /// <param name="depth1">How far away from the camera the first point is (For rendering things on top of each other) (Negative values are always drawn)</param> /// <param name="depth2">How far away from the camera the second point is (For rendering things on top of each other) (Negative values are always drawn)</param>
+			void DrawLineS(float x1, float y1, float x2, float y2, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1) { DrawLine(ScreenPosToPoint(x1, y1), ScreenPosToPoint(x2, y2), col, cha, depth1, depth2); }
+							/// <summary>Draws a line on the command pront from a point in relative screen space to another point in relative screen space</summary> /// <param name="p1">The position of the first point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="p2">The position of the second point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param> /// <param name="depth1">How far away from the camera the first point is (For rendering things on top of each other) (Negative values are always drawn)</param> /// <param name="depth2">How far away from the camera the second point is (For rendering things on top of each other) (Negative values are always drawn)</param>
+			void DrawLineS(VEC2F p1, VEC2F p2, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1) { DrawLine(ScreenPosToPoint(p1), ScreenPosToPoint(p2), col, cha, depth1, depth2); }
 		#pragma endregion
 
 		//Uses trigonometry to get the vertices of a regular polygon of 'edges' sides and then connects them with lines
@@ -429,21 +438,22 @@ namespace cmde
 						/// <param name="rot">The angle at which to draw the polygon in degrees</param>
 						/// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param>
 						/// <param name="cha">The character with which to draw the polygon</param>
-		void DrawRPoly(float cx, float cy, short edges, float rad, float rot = 0, short col = 0x000F, short cha = 0x2588)
+						/// <param name="depth">How far away from the camera the shape is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void DrawRPoly(float cx, float cy, short edges, float rad, float rot = 0, short col = 0x000F, short cha = 0x2588, float depth = -1)
 			{
 				float as = (360.0f / edges) * RAD;
 				float max = (360.0f + rot) * RAD;
 				for (float a = rot * RAD; a < max; a += as)
 				{
-					DrawLine(cos(a) * rad + cx, sin(a) * rad + cy, cos(a + as) * rad + cx, sin(a + as) * rad + cy, col, cha);
+					DrawLine(cos(a) * rad + cx, sin(a) * rad + cy, cos(a + as) * rad + cx, sin(a + as) * rad + cy, col, cha, depth, depth);
 				}
 			}
-							/// <summary>Draws a regular polygon to the screen</summary> /// <param name="p">The position of the center of the polygon</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param>
-			void DrawRPoly(VEC2F p, short edges, float rad, float rot = 0, short col = 0x000F, short cha = 0x2588) { DrawRPoly(p.x, p.y, edges, rad, rot, col, cha); }
-							/// <summary>Draws a regular polygon to the screen using relative screen space</summary> /// <param name="cx">The x position of the center of the polygon in relative screen space</param> /// <param name="cy">The y position of the center of the polygon in relative screen space</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices in relative screen space</param> /// <param name="useY">Whether the radius' size is defined by the screen's height or width ('true' means height is used; 'false' for width)</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param>
-			void DrawRPolyS(float cx, float cy, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588) { DrawRPoly(ScreenPosToPoint(cx, cy), edges, (useY ? ScreenPosToPoint(0, rad).y : ScreenPosToPoint(rad, 0).x), rot, col, cha); }
-							/// <summary>Draws a regular polygon to the screen using relative screen space</summary> /// <param name="p">The position of the center of the polygon in relative screen space</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices in relative screen space</param> /// <param name="useY">Whether the radius' size is defined by the screen's height or width ('true' means height is used; 'false' for width)</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param>
-			void DrawRPolyS(VEC2F p, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588) { DrawRPolyS(p.x, p.y, edges, rad, useY, rot, col, cha); }
+							/// <summary>Draws a regular polygon to the screen</summary> /// <param name="p">The position of the center of the polygon</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+			void DrawRPoly(VEC2F p, short edges, float rad, float rot = 0, short col = 0x000F, short cha = 0x2588, float depth = -1) { DrawRPoly(p.x, p.y, edges, rad, rot, col, cha, depth); }
+							/// <summary>Draws a regular polygon to the screen using relative screen space</summary> /// <param name="cx">The x position of the center of the polygon in relative screen space</param> /// <param name="cy">The y position of the center of the polygon in relative screen space</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices in relative screen space</param> /// <param name="useY">Whether the radius' size is defined by the screen's height or width ('true' means height is used; 'false' for width)</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+			void DrawRPolyS(float cx, float cy, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588, float depth = -1) { DrawRPoly(ScreenPosToPoint(cx, cy), edges, (useY ? ScreenPosToPoint(0, rad).y : ScreenPosToPoint(rad, 0).x), rot, col, cha, depth); }
+							/// <summary>Draws a regular polygon to the screen using relative screen space</summary> /// <param name="p">The position of the center of the polygon in relative screen space</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices in relative screen space</param> /// <param name="useY">Whether the radius' size is defined by the screen's height or width ('true' means height is used; 'false' for width)</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+			void DrawRPolyS(VEC2F p, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588, float depth = -1) { DrawRPolyS(p.x, p.y, edges, rad, useY, rot, col, cha, depth); }
 		#pragma endregion
 
 						/// <summary>
@@ -454,17 +464,29 @@ namespace cmde
 						/// <param name="text">The text to write</param>
 						/// <param name="length">The amount of characters in the text</param>
 						/// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param>
-		void WriteText(short x, short y, wchar_t *text, int length, short col = 0x000F)
+						/// <param name="depth">How far away from the camera the text is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void WriteText(short x, short y, wchar_t *text, int length, short col = 0x000F, float depth = -1)
 		{
 			for (int i = 0; i < length; i++)
 			{
-				Draw(i + x, (short)y, 0x000F, text[i]);
+				Draw(i + x, (short)y, 0x000F, text[i], depth);
 			}
 		}
 
-		void DrawTriangle(VEC2F v1, VEC2F v2, VEC2F v3, short col = 0x000F, short cha = 0x2588)
+		/// <summary>
+		/// Draws a filled in triangle to the command prompt from 3 vertices
+		/// </summary>
+		/// <param name="v1">The first vertice of the triangle</param>
+		/// <param name="v2">The second vertice of the triangle</param>
+		/// <param name="v3">The third vertice of the triangle</param>
+		/// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param>
+		/// <param name="cha">The character with which to draw to that point</param>
+		/// <param name="depth1">How far away from the camera the first vertice is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		/// <param name="depth2">How far away from the camera the second vertice is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		/// <param name="depth3">How far away from the camera the third vertice is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void DrawTriangle(VEC2F v1, VEC2F v2, VEC2F v3, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1, float depth3 = -1)
 		{
-			VEC2F list[3] = { VEC2F(v1.x, v1.y), VEC2F(v2.x, v2.y), VEC2F(v3.x, v3.y) };
+			VEC3F list[3] = { VEC3F(v1.x, v1.y, depth1), VEC3F(v2.x, v2.y, depth2), VEC3F(v3.x, v3.y, depth3) };
 			for (short i = 0; i < 2; i++)
 			{
 				if (list[i].y < list[0].y)
@@ -476,12 +498,13 @@ namespace cmde
 					std::swap(list[i], list[2]);
 				}
 			}
-			VEC2F b1, b2, t1;
+			VEC3F b1, b2, t1;
 			if ((short)list[0].y == (short)list[2].y)
 			{
 				//Line
-				DrawLine(list[0], list[1], col, cha);
-				DrawLine(list[1], list[2], col, cha);
+				DrawLine(list[0], list[1], col, cha, list[0].z, list[1].z);
+				DrawLine(list[1], list[2], col, cha, list[1].z, list[2].z);
+				DrawLine(list[2], list[0], col, cha, list[2].z, list[0].z);
 			}
 			else
 			{
@@ -503,9 +526,9 @@ namespace cmde
 					{
 						//Turn into 2 triangles with a flat side and then pass them both through this function
 						b1 = list[1];
-						b2 = VEC2F(LinearFunction(list[0].y, list[0].x, list[2].y, list[2].x, b1.y), b1.y);
-						DrawTriangle(list[0], b1, b2, col, cha);
-						DrawTriangle(b1, b2, list[2], col, cha);
+						b2 = VEC3F(LinearFunction(list[0].y, list[0].x, list[2].y, list[2].x, b1.y), b1.y, LinearFunction(list[0].y, list[0].z, list[2].y, list[2].z, b1.y));
+						DrawTriangle(list[0], b1, b2, col, cha, list[0].z, b1.z, b2.z);
+						DrawTriangle(b1, b2, list[2], col, cha, b1.z, b2.z, list[2].z);
 						return;
 					}
 				}
@@ -516,26 +539,28 @@ namespace cmde
 			short ux1 = (b1.x < t1.x ? 1 : -1), ux2 = (b2.x < t1.x ? 1 : -1), uy = (b1.y < t1.y ? 1 : -1);
 			float tx1 = t1.x - b1.x, tx2 = t1.x - b2.x, ty = t1.y - b1.y;
 			float sx1 = (ty != 0 ? ux1 * abs(tx1 / ty) : 0), sy1 = (tx1 != 0 ? uy * abs(ty / tx1) : 0), sx2 = (ty != 0 ? ux2 * abs(tx2 / ty) : 0), sy2 = (tx2 != 0 ? uy * abs(ty / tx2) : 0);
-			DrawLine(b1.x, b1.y, b2.x, b2.y, col, cha);
-			Draw(t1.x, t1.y, col, cha);
+			DrawLine(b1.x, b1.y, b2.x, b2.y, col, cha, b1.z, b2.z);
+			Draw(t1.x, t1.y, col, cha, t1.z);
 			tx1 = fmod(ux1 - fmod(b1.x, 1.0f), 1.0f);
 			tx2 = fmod(ux2 - fmod(b2.x, 1.0f), 1.0f);
 			ty = fmod(uy - fmod(b1.y, 1.0f), 1.0f);
 
+			LINEAR b1Depth = LinearFunction(b1.y, b1.z, t1.y, t1.z);
 			//+1 on x for line 1 & +? on y for line 1
 			for (float x = b1.x + tx1, y = b1.y + uy * abs(tx1 * sy1); x * ux1 < t1.x * ux1; x += ux1, y += sy1)
 			{
-				Draw(x, y, col, cha);
+				Draw(x, y, col, cha, b1Depth.f(y).y);
 			}
+			LINEAR b2Depth = LinearFunction(b2.y, b2.z, t1.y, t1.z);
 			//+1 on x for line 2 & +? on y for line 2
 			for (float x = b2.x + tx2, y = b2.y + uy * abs(tx2 * sy2); x * ux2 < t1.x * ux2; x += ux2, y += sy2)
 			{
-				Draw(x, y, col, cha);
+				Draw(x, y, col, cha, b2Depth.f(y).y);
 			}
 			//+1 on y for line 1 & 2, & +? on x for line 1 & 2
 			for (float y = b1.y + ty, x1 = b1.x + ux1 * abs(ty * sx1), x2 = b2.x + ux2 * abs(ty * sx2); y * uy < t1.y * uy; y += uy, x1 += sx1, x2 += sx2)
 			{
-				DrawLine(x1, y, x2, y, col, cha);
+				DrawLine(x1, y, x2, y, col, cha, b1Depth.f(y).y, b2Depth.f(y).y);
 			}
 		}
 	#pragma endregion
@@ -558,6 +583,7 @@ namespace cmde
 			for (int i = 0; i < pixelCount; i++)
 			{
 				screen[i] = emptyChar;
+				zBuffer[i] = farPlane;
 			}
 		}
 
@@ -1027,7 +1053,6 @@ public:
 
 class Test3D : public cmde::CMDEngine
 {
-
 	struct Triangle
 	{
 		cmde::VEC3F vertices[3];
@@ -1177,21 +1202,18 @@ class Test3D : public cmde::CMDEngine
 		return output;
 	}
 
-
-	cmde::VEC3F ProjectionMatrixify(cmde::VEC3F v)
+	cmde::VEC2F ProjectionMatrixify(cmde::VEC3F v, float farPlane, float nearPlane)
 	{
 		float fov = 90.0f;
 		float f = 1.0f / tanf(fov * 0.5f * RAD);
-		float farPlane = 1000.0f;
-		float nearPlane = 0.1f;
-		v.z = -v.z; //This thing uses - distance for depth, but since I use + distance everywhere else, this tiny change is necessary
 		if (v.z != 0)
-			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / v.z, (f * v.y) / v.z, ((v.z - nearPlane) * (farPlane / (farPlane - nearPlane))) / v.z };
-		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y), ((v.z - nearPlane) * (farPlane / (farPlane - nearPlane))) };
+			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / -v.z, (f * v.y) / -v.z };
+		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y) };
 	}
 
 public:
 	Mesh shape;
+	Mesh shape2;
 	cmde::VEC3F pos;
 	cmde::VEC2F facing;
 	cmde::VEC2F fov;
@@ -1202,10 +1224,13 @@ public:
 	cmde::VEC3F up;
 	bool myRenderingSystem;
 	bool wireframe;
+	float nearPlane;
+
 
 	Test3D(short screenWidth, short screenHeight, short fontWidth, short fontHeight) : cmde::CMDEngine(screenWidth, screenHeight, fontWidth, fontHeight, true, true, FPS60)
 	{
 		shape = Mesh();
+		shape2 = Mesh();
 		pos = { 0.5f, 0.5f, -2 };
 		fov = { 90, 90 };
 		facing = { 0, 0 };
@@ -1218,11 +1243,13 @@ public:
 		myRenderingSystem = false;
 		wireframe = false;
 		emptyChar.Attributes = 0x0088;
+		nearPlane = 0.1f;
+		farPlane = 1000.0f;
 	}
 
 	void Setup()
 	{
-		///* 
+		/* 
 		//1x1x1 Cube (with outline)
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, true, false, true });
 		shape.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 }, true, true, false });
@@ -1236,9 +1263,9 @@ public:
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 }, false, true, true });
 		shape.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, true, true, false });
 		shape.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 }, false, true, true });
-		//*/
+		*/
 
-		/* 
+		///* 
 		//1x1x1 Cube
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 } });
 		shape.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 } });
@@ -1252,7 +1279,23 @@ public:
 		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 } });
 		shape.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 } });
 		shape.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 } });
-		*/
+		//*/
+
+		///*
+		//2x2x2 Cube (With Z+2 offset)
+		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 2, 2 }, { 2, 0, 2 } });
+		shape2.AddTriangle({ { 0, 2, 2 }, { 2, 2, 2 }, { 2, 0, 2 } });
+		shape2.AddTriangle({ { 0, 0, 2 }, { 2, 0, 2 }, { 0, 0, 4 } });
+		shape2.AddTriangle({ { 2, 0, 2 }, { 2, 0, 4 }, { 0, 0, 4 } });
+		shape2.AddTriangle({ { 2, 0, 2 }, { 2, 2, 2 }, { 2, 0, 4 } });
+		shape2.AddTriangle({ { 2, 2, 2 }, { 2, 2, 4 }, { 2, 0, 4 } });
+		shape2.AddTriangle({ { 0, 2, 2 }, { 0, 2, 4 }, { 2, 2, 4 } });
+		shape2.AddTriangle({ { 0, 2, 2 }, { 2, 2, 4 }, { 2, 2, 2 } });
+		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 0, 4 }, { 0, 2, 4 } });
+		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 2, 4 }, { 0, 2, 2 } });
+		shape2.AddTriangle({ { 0, 0, 4 }, { 2, 0, 4 }, { 2, 2, 4 } });
+		shape2.AddTriangle({ { 0, 0, 4 }, { 2, 2, 4 }, { 0, 2, 4 } });
+		//*/
 
 		/*
 		//1x20x1 Pole
@@ -1304,120 +1347,101 @@ public:
 	{
 		wchar_t print[128] = {};
 		int tempCounter = 0;
-		cmde::VEC3F offset = shape.center - pos;
-		if (DotProduct(forwards, offset) > 0)
+
+		cmde::VEC3F slr = left * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
+		cmde::VEC3F slb = up * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
+		cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(left, sightLimitT), CrossProduct(up, slr), CrossProduct(slb, left) };
+		//cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(up, slr) };
+		//Near and far planes too
+
+		//std::vector<Triangle> newTriangles = shape.triangles;
+		std::vector<Triangle> newTriangles = ClipTriangles(4, shape.triangles, pos, inBounds);
+		std::vector<Triangle> addVector = ClipTriangles(4, shape2.triangles, pos, inBounds);
+		newTriangles.insert(newTriangles.end(), addVector.begin(), addVector.end());
+		for (Triangle t : newTriangles)
 		{
-			/*
-			for (Triangle t : shape.triangles)
+			if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - pos) > 0)
 			{
-				cmde::VEC2F vertices[3];
-				for (int i = 0; i < 3; i++)
+				//Backface culling
+				continue;
+			}
+			cmde::VEC3F vertices[3];
+			for (int i = 0; i < 3; i++)
+			{
+				if (myRenderingSystem == true)
 				{
+					DrawLine({ 0, 0 }, { 2, 0 });
+					DrawLine({ 0, 2 }, { 2, 2 });
+					DrawLine({ 0, 4 }, { 2, 4 });
+					Draw(0.0f, 1.0f);
+					Draw(2.0f, 3.0f);
 					cmde::VEC3F temp = t.vertices[i] - pos;
 					cmde::VEC3F hTemp = forwards * DotProduct(temp, forwards);
 					cmde::VEC3F vTemp = hTemp + up * DotProduct(temp, up);
 					hTemp = hTemp + left * DotProduct(temp, left);
 					float hAngle = Angle(hTemp, sightLimitL);
 					float vAngle = Angle(vTemp, sightLimitT);
-					vertices[i] = ScreenPosToPoint((hAngle / fov.x) * (DotProduct(CrossProduct(hTemp, sightLimitL), up) > 0.2f ? 1 : -1), (vAngle / fov.y) * (-DotProduct(CrossProduct(vTemp, sightLimitT), left) > 0 ? 1 : -1));
-				}
-				short color = (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) < 0 ? 0x00EE : 0x00BB);
-				if (OnScreen(vertices[0]) && OnScreen(vertices[1]))
-					DrawLine(vertices[0], vertices[1], color);
-				if (OnScreen(vertices[1]) && OnScreen(vertices[2]))
-					DrawLine(vertices[1], vertices[2], color);
-				if (OnScreen(vertices[2]) && OnScreen(vertices[0]))
-					DrawLine(vertices[2], vertices[0], color);
-			}
-			*/
-			
 
-			cmde::VEC3F slr = left * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
-			cmde::VEC3F slb = up * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
-			cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(left, sightLimitT), CrossProduct(up, slr), CrossProduct(slb, left) };
-			//cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(up, slr) };
-			//Near and far planes too
+					/*
+					tempCounter = swprintf(print, 128, L"temp: (%f, %f, %f)", temp.x, temp.y, temp.z);
+					WriteText(0, 5, print, tempCounter);
+					tempCounter = swprintf(print, 128, L"hTemp: (%f, %f, %f)", hTemp.x, hTemp.y, hTemp.z);
+					WriteText(0, 6, print, tempCounter);
+					tempCounter = swprintf(print, 128, L"vTemp: (%f, %f, %f)", vTemp.x, vTemp.y, vTemp.z);
+					WriteText(0, 7, print, tempCounter);
 
-			//std::vector<Triangle> newTriangles = shape.triangles;
-			std::vector<Triangle> newTriangles = ClipTriangles(4, shape.triangles, pos, inBounds);
-			for (Triangle t : newTriangles)
-			{
-				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - pos) > 0)
-				{
-					//Backface culling
-					continue;
-				}
-				cmde::VEC2F vertices[3];
-				for (int i = 0; i < 3; i++)
-				{
-					if (myRenderingSystem == true)
-					{
-						DrawLine({ 0, 0 }, { 2, 0 });
-						DrawLine({ 0, 2 }, { 2, 2 });
-						DrawLine({ 0, 4 }, { 2, 4 });
-						Draw(0.0f, 1.0f);
-						Draw(2.0f, 3.0f);
-						cmde::VEC3F temp = t.vertices[i] - pos;
-						cmde::VEC3F hTemp = forwards * DotProduct(temp, forwards);
-						cmde::VEC3F vTemp = hTemp + up * DotProduct(temp, up);
-						hTemp = hTemp + left * DotProduct(temp, left);
-						float hAngle = Angle(hTemp, sightLimitL);
-						float vAngle = Angle(vTemp, sightLimitT);
+					tempCounter = swprintf(print, 128, L"(%f, %f, %f)", sightLimitL.x, sightLimitL.y, sightLimitL.z);
+					WriteText(0, 5, print, tempCounter);
+					tempCounter = swprintf(print, 128, L"%f°)", Angle(hTemp, sightLimitL));
+					WriteText(0, 6, print, tempCounter);
+					tempCounter = swprintf(print, 128, L"(%f, %f, %f)", hTemp.x, hTemp.y, hTemp.z);
+					WriteText(0, 7, print, tempCounter);
+					*/
 
-						/*
-						tempCounter = swprintf(print, 128, L"temp: (%f, %f, %f)", temp.x, temp.y, temp.z);
-						WriteText(0, 5, print, tempCounter);
-						tempCounter = swprintf(print, 128, L"hTemp: (%f, %f, %f)", hTemp.x, hTemp.y, hTemp.z);
-						WriteText(0, 6, print, tempCounter);
-						tempCounter = swprintf(print, 128, L"vTemp: (%f, %f, %f)", vTemp.x, vTemp.y, vTemp.z);
-						WriteText(0, 7, print, tempCounter);
-
-						tempCounter = swprintf(print, 128, L"(%f, %f, %f)", sightLimitL.x, sightLimitL.y, sightLimitL.z);
-						WriteText(0, 5, print, tempCounter);
-						tempCounter = swprintf(print, 128, L"%f°)", Angle(hTemp, sightLimitL));
-						WriteText(0, 6, print, tempCounter);
-						tempCounter = swprintf(print, 128, L"(%f, %f, %f)", hTemp.x, hTemp.y, hTemp.z);
-						WriteText(0, 7, print, tempCounter);
-						*/
-
-						vertices[i] = ScreenPosToPoint((hAngle / fov.x), (vAngle / fov.y));
-					}
-					else
-					{
-						DrawLine({ 0, 0 }, { 2, 0 });
-						DrawLine({ 0, 2 }, { 2, 2 });
-						DrawLine({ 0, 0 }, { 0, 4 });
-						Draw(2.0f, 1.0f);
-						cmde::VEC3F temp = t.vertices[i] - pos;
-						temp = { DotProduct(temp, left), DotProduct(temp, up), DotProduct(temp, forwards) };
-						vertices[i] = (ProjectionMatrixify(temp) + cmde::VEC3F(1, 1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
-					}
-				}
-				if (wireframe == true)
-				{
-					short color = (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) < 0 ? 0x00EE : 0x00BB);
-					if (t.visibleSides[0] == true)
-						DrawLine(vertices[0], vertices[1], color);
-					if (t.visibleSides[1] == true)
-						DrawLine(vertices[1], vertices[2], color);
-					if (t.visibleSides[2] == true)
-						DrawLine(vertices[2], vertices[0], color);
+					vertices[i] = ScreenPosToPoint((hAngle / fov.x), (vAngle / fov.y));
+					vertices[i].z = Magnitude(temp);
 				}
 				else
 				{
-					if (t.visibleSides[0] == true)
-						DrawLine(vertices[0], vertices[1], 0x0000);
-					if (t.visibleSides[1] == true)
-						DrawLine(vertices[1], vertices[2], 0x0000);
-					if (t.visibleSides[2] == true)
-						DrawLine(vertices[2], vertices[0], 0x0000);
-					DrawTriangle(vertices[0], vertices[1], vertices[2]);
+					DrawLine({ 0, 0 }, { 2, 0 });
+					DrawLine({ 0, 2 }, { 2, 2 });
+					DrawLine({ 0, 0 }, { 0, 4 });
+					Draw(2.0f, 1.0f);
+					cmde::VEC3F temp = t.vertices[i] - pos;
+					temp = { DotProduct(temp, left), DotProduct(temp, up), DotProduct(temp, forwards) };
+					vertices[i] = (ProjectionMatrixify(temp, farPlane, nearPlane) + cmde::VEC2F(1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
+					vertices[i].z = (temp.z - nearPlane) / (farPlane - nearPlane);
+					/////<summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one<\summary>
+					//float DepthConversion(float depth) { (return depth * farPlane) / (depth * (farPlane - nearPlane) + nearPlane); }
 				}
-
-				//tempCounter = swprintf(print, 128, L"(%f, %f)", vertices[0].x, vertices[0].y);
-				//WriteText((vertices[0].x > 0 ? vertices[0].x : 0), vertices[0].y - 1, print, tempCounter);
 			}
+			if (wireframe == true)
+			{
+				short color = (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) < 0 ? 0x00EE : 0x00BB);
+				if (t.visibleSides[0] == true)
+					DrawLine(vertices[0], vertices[1], color, 0x2588, vertices[0].z, vertices[1].z);
+				if (t.visibleSides[1] == true)
+					DrawLine(vertices[1], vertices[2], color, 0x2588, vertices[1].z, vertices[2].z);
+				if (t.visibleSides[2] == true)
+					DrawLine(vertices[2], vertices[0], color, 0x2588, vertices[2].z, vertices[0].z);
+			}
+			else
+			{
+				/*
+				if (t.visibleSides[0] == true)
+					DrawLine(vertices[0], vertices[1], 0x0000, 0x2588, vertices[0].z, vertices[1].z);
+				if (t.visibleSides[1] == true)
+					DrawLine(vertices[1], vertices[2], 0x0000, 0x2588, vertices[1].z, vertices[2].z);
+				if (t.visibleSides[2] == true)
+					DrawLine(vertices[2], vertices[0], 0x0000, 0x2588, vertices[2].z, vertices[0].z);
+				*/
+				DrawTriangle(vertices[0], vertices[1], vertices[2], 0x000F, 0x2588, vertices[0].z, vertices[1].z, vertices[2].z);
+			}
+
+			//tempCounter = swprintf(print, 128, L"(%f, %f)", vertices[0].x, vertices[0].y);
+			//WriteText((vertices[0].x > 0 ? vertices[0].x : 0), vertices[0].y - 1, print, tempCounter);
 		}
+		
 
 		pos = pos + forwards * (inputs[L'w'] >= 2 ? 0.005f : 0);
 		pos = pos + left * (inputs[L'a'] >= 2 ? 0.005f : 0);
@@ -1441,6 +1465,12 @@ public:
 		up = VectorFromAngles(facing.x, facing.y + 90);		//  0,  1,  0
 		sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
+
+		for (short i = 0; i < screenSize.Y; i++)
+		{
+			tempCounter = swprintf(print, 128, L"D: %f", zBuffer[i * screenSize.X + 10]);
+			WriteText(10, i, print, tempCounter);
+		}
 
 		/*
 		tempCounter = swprintf(print, 128, L"X: %f | Y: %f | Z: %f", pos.x, pos.y, pos.z);
