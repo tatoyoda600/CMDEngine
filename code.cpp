@@ -158,7 +158,6 @@ namespace cmde
 		wchar_t title[256];
 		float fpsLimit;
 		float* zBuffer;
-		float farPlane;
 		/// <summary>0 -> nothing ; 1 -> released ; 2 -> pressed ; 3 -> held ; MOUSE_X & MOUSE_Y -> point on the command prompt</summary>
 		std::map<wchar_t, short> inputs;
 
@@ -179,7 +178,6 @@ namespace cmde
 			_pixelCount = screenWidth * screenHeight;
 			autoClearScreen = clearScreen;
 			running = true;
-			farPlane = 1000.0f;
 			if (fontWidth > 30 || fontHeight > 30)
 			{
 				ThrowError(L"FontTooBig (30)");
@@ -583,7 +581,7 @@ namespace cmde
 			for (int i = 0; i < pixelCount; i++)
 			{
 				screen[i] = emptyChar;
-				zBuffer[i] = farPlane;
+				zBuffer[i] = 1;
 			}
 		}
 
@@ -888,45 +886,45 @@ namespace cmde
 
 		//General useful functions
 	#pragma region MiscFunctions
-		float Pow2(float f)
+		static float Pow2(float f)
 		{
 			return f * f;
 		}
-		float DotProduct(VEC4F v1, VEC4F v2)
+		static float DotProduct(VEC4F v1, VEC4F v2)
 		{
 			return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;
 		}
-		VEC3F CrossProduct(VEC3F v1, VEC3F v2)
+		static VEC3F CrossProduct(VEC3F v1, VEC3F v2)
 		{
 			return { v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x };
 		}
-		float Magnitude(VEC4F v)
+		static float Magnitude(VEC4F v)
 		{
 			return sqrt(abs(DotProduct(v, v)));
 		}
-		float Clamp(float v, float lo, float hi)
+		static float Clamp(float v, float lo, float hi)
 		{
 			return v < lo ? lo : hi < v ? hi : v;
 		}
 						/// <summary>Calculates the angle between 2 vectors in degrees</summary>
-		float Angle(VEC4F v1, VEC4F v2)
+		static float Angle(VEC4F v1, VEC4F v2)
 		{
 			return acos(Clamp(DotProduct(v1, v2) / (Magnitude(v2) * Magnitude(v1)), -1.0f, 1.0f)) * DEG;
 		}
-		VEC4F Normalize(VEC4F v)
+		static VEC4F Normalize(VEC4F v)
 		{
 			return v / Magnitude(v);
 		}
 	#pragma region LinearFunction
 						/// <summary>Calculates the y value of point x on the line defined by the 2 points provided (Returns y1 if x1 == x2)</summary>
-		float LinearFunction(float x1, float y1, float x2, float y2, float x)
+		static float LinearFunction(float x1, float y1, float x2, float y2, float x)
 		{
 			if (y1 == y2 || x1 == x2)
 				return y1;
 			return y1 + ((y2 - y1) / (x2 - x1) * (x - x1));
 		}
 						/// <summary>Calculates the point at 'x' on the line defined by the 2 points provided (Returns p1 if p1.x == p2.x)</summary>
-		VEC4F LinearFunction(VEC4F p1, VEC4F p2, float x)
+		static VEC4F LinearFunction(VEC4F p1, VEC4F p2, float x)
 		{
 			if (p1.x == p2.x)
 				return p1;
@@ -934,18 +932,18 @@ namespace cmde
 		}
 		//Warn if both points have the same X and thus can't be made into a linear function
 							/// <summary>Calculates the y value of point x on the line defined by the 2 points provided and inserts it into 'output' (Returns false if x1 == x2)</summary>
-			bool LinearFunction(float x1, float y1, float x2, float y2, float x, float* output) { if (x1 == x2) { return false; } *output = LinearFunction(x1, y1, x2, y2, x); return true; }
+			static bool LinearFunction(float x1, float y1, float x2, float y2, float x, float* output) { if (x1 == x2) { return false; } *output = LinearFunction(x1, y1, x2, y2, x); return true; }
 							/// <summary>Calculates the point at 'x' on the line defined by the 2 points provided and inserts it into 'output' (Returns false if p1.x == p2.x)</summary>
-			bool LinearFunction(VEC4F p1, VEC4F p2, float x, VEC4F* output) { if (p1.x == p2.x) { return false; } *output = LinearFunction(p1, p2, x); return true; }
+			static bool LinearFunction(VEC4F p1, VEC4F p2, float x, VEC4F* output) { if (p1.x == p2.x) { return false; } *output = LinearFunction(p1, p2, x); return true; }
 						/// <summary>Generates the linear function based on 'x' defined by the 2 points provided (Returns y=0 if x1 == x2)</summary>
-		LINEAR LinearFunction(float x1, float y1, float x2, float y2)
+		static LINEAR LinearFunction(float x1, float y1, float x2, float y2)
 		{
 			if (x1 == x2)
 				return LINEAR();
 			return { VEC4F(0, (y2 - y1) / (x2 - x1), 0, 0), VEC4F(0, -(y2 - y1) / (x2 - x1) * x1 + y1, 0, 0) };
 		}
 						/// <summary>Generates the linear function based on 'x' defined by the 2 points provided (Returns y=z=w=0 if p1.x == p2.x)</summary>
-		LINEAR LinearFunction(VEC4F p1, VEC4F p2)
+		static LINEAR LinearFunction(VEC4F p1, VEC4F p2)
 		{
 			if (p1.x == p2.x)
 				return LINEAR();
@@ -954,13 +952,13 @@ namespace cmde
 		}
 		//Warn if both points have the same X and thus can't be made into a linear function
 							/// <summary>Generates the linear function based on 'x' defined by the 2 points provided and inserts it into 'output' (Returns false if x1 == x2)</summary>
-			bool LinearFunction(float x1, float y1, float x2, float y2, LINEAR* output) { if (x1 == x2) { return false; } *output = LinearFunction(x1, y1, x2, y2); return true; }
+			static bool LinearFunction(float x1, float y1, float x2, float y2, LINEAR* output) { if (x1 == x2) { return false; } *output = LinearFunction(x1, y1, x2, y2); return true; }
 							/// <summary>Generates the linear function based on 'x' defined by the 2 points provided and inserts it into 'output' (Returns false if p1.x == p2.x)</summary>
-			bool LinearFunction(VEC4F p1, VEC4F p2, LINEAR* output) { if (p1.x == p2.x) { return false; } *output = LinearFunction(p1, p2); return true; }
+			static bool LinearFunction(VEC4F p1, VEC4F p2, LINEAR* output) { if (p1.x == p2.x) { return false; } *output = LinearFunction(p1, p2); return true; }
 	#pragma endregion
 
 						/// <summary>Calculates the point at 'x' on the line defined by the 3 points provided and inserts it into 'output' (Returns false if there is any repeat value in p1.x, p2.x, and p3.x)<summary>
-		bool QuadraticFunction(VEC2F p1, VEC2F p2, VEC2F p3, float x, VEC2F* output)
+		static bool QuadraticFunction(VEC2F p1, VEC2F p2, VEC2F p3, float x, VEC2F* output)
 		{
 			if (p1.x == p2.x || p1.x == p3.x || p2.x == p3.x)
 			{
@@ -978,7 +976,7 @@ namespace cmde
 			return true;
 		}
 						/// <summary>Generates the quadratic function based on 'x' defined by the 3 points provided and inserts it into 'output' (Returns false if there is any repeat value in p1.x, p2.x, and p3.x)<summary>
-		bool QuadraticFunction(VEC4F p1, VEC4F p2, VEC4F p3, QUADRATIC* output)
+		static bool QuadraticFunction(VEC4F p1, VEC4F p2, VEC4F p3, QUADRATIC* output)
 		{
 			if (p1.x == p2.x || p1.x == p3.x || p2.x == p3.x)
 			{
@@ -997,7 +995,7 @@ namespace cmde
 		}
 
 						/// <summary>Assumes the XYZ axis are set up correctly (X+ is left when Z+ is forwards and Y+ is up)</summary>
-		VEC3F VectorFromAngles(float h, float v)
+		static VEC3F VectorFromAngles(float h, float v)
 		{
 			return { sin(h * RAD) * cos(v * RAD), sin(v * RAD), cos(h * RAD) * cos(v * RAD) };
 		}
@@ -1051,14 +1049,15 @@ public:
 
 #include <vector>
 
-class Test3D : public cmde::CMDEngine
+class Test3DNoCam : public cmde::CMDEngine
 {
 	struct Triangle
 	{
 		cmde::VEC3F vertices[3];
 		bool visibleSides[3];
+		short color;
 
-		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3)
+		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3, short col = 0x00FF)
 		{
 			vertices[0] = p1;
 			vertices[1] = p2;
@@ -1066,9 +1065,10 @@ class Test3D : public cmde::CMDEngine
 			visibleSides[0] = true;
 			visibleSides[1] = true;
 			visibleSides[2] = true;
+			color = col;
 		}
 
-		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3, bool s1, bool s2, bool s3)
+		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3, short col, bool s1, bool s2, bool s3)
 		{
 			vertices[0] = p1;
 			vertices[1] = p2;
@@ -1076,6 +1076,7 @@ class Test3D : public cmde::CMDEngine
 			visibleSides[0] = s1;
 			visibleSides[1] = s2;
 			visibleSides[2] = s3;
+			color = col;
 		}
 	};
 
@@ -1112,7 +1113,7 @@ class Test3D : public cmde::CMDEngine
 		void AddTriangles(std::vector<Triangle> triangles) { this->triangles.insert(this->triangles.end(), triangles.begin(), triangles.end()); }
 	};
 
-	bool LinePlaneIntersection(cmde::VEC3F planePoint, cmde::VEC3F planeNormal, cmde::VEC3F lineOrigin, cmde::VEC3F lineDirection, cmde::VEC3F* output)
+	static bool LinePlaneIntersection(cmde::VEC3F planePoint, cmde::VEC3F planeNormal, cmde::VEC3F lineOrigin, cmde::VEC3F lineDirection, cmde::VEC3F* output)
 	{
 		planeNormal = Normalize(planeNormal);
 		float nd = DotProduct(planeNormal, lineDirection);
@@ -1124,7 +1125,7 @@ class Test3D : public cmde::CMDEngine
 		return true;
 	}
 
-	std::vector<Triangle> ClipTriangles(short tempInBoundsCount, std::vector<Triangle> ts, cmde::VEC3F cameraPos, cmde::VEC3F inBounds[6])
+	static std::vector<Triangle> ClipTriangles(short tempInBoundsCount, std::vector<Triangle> ts, cmde::VEC3F cameraPos, cmde::VEC3F inBounds[6])
 	{
 		//'i' SHOULD BE THE AMOUNT OF 'inBounds' THERE ARE (6), BUT I'VE ONLY GOT 4 SO FAR
 		for (short i = 0; i < tempInBoundsCount; i++)
@@ -1140,14 +1141,14 @@ class Test3D : public cmde::CMDEngine
 		return ts;
 	}
 
-	std::vector<Triangle> ClipTriangle(Triangle t, cmde::VEC3F cameraPos, cmde::VEC3F inBounds)
+	static std::vector<Triangle> ClipTriangle(Triangle t, cmde::VEC3F cameraPos, cmde::VEC3F inBounds)
 	{
 		bool oob[3] = { false };
 		short c = 0;
 		std::vector<Triangle> output = std::vector<Triangle>();
 		for (short i = 0; i < 3; i++)
 		{
-			if (DotProduct(t.vertices[i] - pos, inBounds) < 0)
+			if (DotProduct(t.vertices[i] - cameraPos, inBounds) < 0)
 			{
 				oob[i] = true;
 				c++;
@@ -1192,11 +1193,11 @@ class Test3D : public cmde::CMDEngine
 			//nothing
 			break;
 		case 1:
-			output.push_back(Triangle(new1, g1, g2, true && t.visibleSides[o], true && t.visibleSides[(o + 1) % 3], false));
-			output.push_back(Triangle(new1, g2, new2, false, true && t.visibleSides[(o + 2) % 3], false));
+			output.push_back(Triangle(new1, g1, g2, t.color, true && t.visibleSides[o], true && t.visibleSides[(o + 1) % 3], false));
+			output.push_back(Triangle(new1, g2, new2, t.color, false, true && t.visibleSides[(o + 2) % 3], false));
 			break;
 		case 2:
-			output.push_back(Triangle(g, new1, new2, true && t.visibleSides[o], false, true && t.visibleSides[(o + 2) % 3]));
+			output.push_back(Triangle(g, new1, new2, t.color, true && t.visibleSides[o], false, true && t.visibleSides[(o + 2) % 3]));
 			break;
 		}
 		return output;
@@ -1211,9 +1212,27 @@ class Test3D : public cmde::CMDEngine
 		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y) };
 	}
 
+	static cmde::VEC2F ProjectionMatrixify(cmde::VEC3F v, float farPlane, float nearPlane, COORD screenSize)
+	{
+		float fov = 90.0f;
+		float f = 1.0f / tanf(fov * 0.5f * RAD);
+		if (v.z != 0)
+			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / -v.z, (f * v.y) / -v.z };
+		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y) };
+	}
+
+	///<summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one<\summary>
+	float DepthConversion(float depth)
+	{
+		return (depth * farPlane) / (depth * (farPlane - nearPlane) + nearPlane);
+	}
+
 public:
-	Mesh shape;
+	Mesh shape1;
 	Mesh shape2;
+	Mesh shape3;
+	Mesh shape4;
+	Mesh shape5;
 	cmde::VEC3F pos;
 	cmde::VEC2F facing;
 	cmde::VEC2F fov;
@@ -1225,12 +1244,16 @@ public:
 	bool myRenderingSystem;
 	bool wireframe;
 	float nearPlane;
+	float farPlane;
 
 
-	Test3D(short screenWidth, short screenHeight, short fontWidth, short fontHeight) : cmde::CMDEngine(screenWidth, screenHeight, fontWidth, fontHeight, true, true, FPS60)
+	Test3DNoCam(short screenWidth, short screenHeight, short fontWidth, short fontHeight) : cmde::CMDEngine(screenWidth, screenHeight, fontWidth, fontHeight, true, true, FPS60)
 	{
-		shape = Mesh();
+		shape1 = Mesh();
 		shape2 = Mesh();
+		shape3 = Mesh();
+		shape4 = Mesh();
+		shape5 = Mesh();
 		pos = { 0.5f, 0.5f, -2 };
 		fov = { 90, 90 };
 		facing = { 0, 0 };
@@ -1244,102 +1267,273 @@ public:
 		wireframe = false;
 		emptyChar.Attributes = 0x0088;
 		nearPlane = 0.1f;
-		farPlane = 1000.0f;
+		farPlane = 200.0f;
 	}
 
 	void Setup()
 	{
-		/* 
 		//1x1x1 Cube (with outline)
-		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, true, false, true });
-		shape.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 }, true, true, false });
-		shape.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, true, false, true });
-		shape.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, true, true, false });
-		shape.AddTriangle({ { 1, 0, 0 }, { 1, 1, 0 }, { 1, 0, 1 }, true, false, true });
-		shape.AddTriangle({ { 1, 1, 0 }, { 1, 1, 1 }, { 1, 0, 1 }, true, true, false });
-		shape.AddTriangle({ { 0, 1, 0 }, { 0, 1, 1 }, { 1, 1, 1 }, true, true, false });
-		shape.AddTriangle({ { 0, 1, 0 }, { 1, 1, 1 }, { 1, 1, 0 }, false, true, true });
-		shape.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 1 }, true, true, false });
-		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 }, false, true, true });
-		shape.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, true, true, false });
-		shape.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 }, false, true, true });
+		/*
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, true, false, true });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 }, true, true, false });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, true, false, true });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, true, true, false });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 1, 0 }, { 1, 0, 1 }, true, false, true });
+		shape1.AddTriangle({ { 1, 1, 0 }, { 1, 1, 1 }, { 1, 0, 1 }, true, true, false });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 0, 1, 1 }, { 1, 1, 1 }, true, true, false });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 1 }, { 1, 1, 0 }, false, true, true });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 1 }, true, true, false });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 }, false, true, true });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, true, true, false });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 }, false, true, true });
 		*/
 
-		///* 
 		//1x1x1 Cube
-		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 } });
-		shape.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 } });
-		shape.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 } });
-		shape.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 } });
-		shape.AddTriangle({ { 1, 0, 0 }, { 1, 1, 0 }, { 1, 0, 1 } });
-		shape.AddTriangle({ { 1, 1, 0 }, { 1, 1, 1 }, { 1, 0, 1 } });
-		shape.AddTriangle({ { 0, 1, 0 }, { 0, 1, 1 }, { 1, 1, 1 } });
-		shape.AddTriangle({ { 0, 1, 0 }, { 1, 1, 1 }, { 1, 1, 0 } });
-		shape.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 1 } });
-		shape.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 } });
-		shape.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 } });
-		shape.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 } });
-		//*/
-
-		///*
-		//2x2x2 Cube (With Z+2 offset)
-		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 2, 2 }, { 2, 0, 2 } });
-		shape2.AddTriangle({ { 0, 2, 2 }, { 2, 2, 2 }, { 2, 0, 2 } });
-		shape2.AddTriangle({ { 0, 0, 2 }, { 2, 0, 2 }, { 0, 0, 4 } });
-		shape2.AddTriangle({ { 2, 0, 2 }, { 2, 0, 4 }, { 0, 0, 4 } });
-		shape2.AddTriangle({ { 2, 0, 2 }, { 2, 2, 2 }, { 2, 0, 4 } });
-		shape2.AddTriangle({ { 2, 2, 2 }, { 2, 2, 4 }, { 2, 0, 4 } });
-		shape2.AddTriangle({ { 0, 2, 2 }, { 0, 2, 4 }, { 2, 2, 4 } });
-		shape2.AddTriangle({ { 0, 2, 2 }, { 2, 2, 4 }, { 2, 2, 2 } });
-		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 0, 4 }, { 0, 2, 4 } });
-		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 2, 4 }, { 0, 2, 2 } });
-		shape2.AddTriangle({ { 0, 0, 4 }, { 2, 0, 4 }, { 2, 2, 4 } });
-		shape2.AddTriangle({ { 0, 0, 4 }, { 2, 2, 4 }, { 0, 2, 4 } });
-		//*/
-
 		/*
-		//1x20x1 Pole
-		shape.AddTriangle({ { 0, -10, 0 }, { 0, 10, 0 }, { 1, -10, 0 } });
-		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, -10, 0 } });
-		shape.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 } });
-		shape.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 } });
-		shape.AddTriangle({ { 1, -10, 0 }, { 1, 10, 0 }, { 1, -10, 1 } });
-		shape.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, -10, 1 } });
-		shape.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 } });
-		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 } });
-		shape.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 10, 1 } });
-		shape.AddTriangle({ { 0, -10, 0 }, { 0, 10, 1 }, { 0, 10, 0 } });
-		shape.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 10, 1 } });
-		shape.AddTriangle({ { 0, -10, 1 }, { 1, 10, 1 }, { 0, 10, 1 } });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 1, 0 }, { 1, 0, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 1, 1, 0 }, { 1, 1, 1 }, { 1, 0, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 0, 1, 1 }, { 1, 1, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 1 }, { 1, 1, 0 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 }, 0x00AA });
 		*/
 
+		//2x2x2 Cube (With Z+2 offset)
 		/*
-		//2x 1x10x1 Pole
-		shape.AddTriangle({ { 0, 0, 0 }, { 0, 10, 0 }, { 1, 0, 0 } });
-		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, 0, 0 } });
-		shape.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 } });
-		shape.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 } });
-		shape.AddTriangle({ { 1, 0, 0 }, { 1, 10, 0 }, { 1, 0, 1 } });
-		shape.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, 0, 1 } });
-		shape.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 } });
-		shape.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 } });
-		shape.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 10, 1 } });
-		shape.AddTriangle({ { 0, 0, 0 }, { 0, 10, 1 }, { 0, 10, 0 } });
-		shape.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 10, 1 } });
-		shape.AddTriangle({ { 0, 0, 1 }, { 1, 10, 1 }, { 0, 10, 1 } });
+		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 2, 2 }, { 2, 0, 2 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 2, 2 }, { 2, 2, 2 }, { 2, 0, 2 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 0, 2 }, { 2, 0, 2 }, { 0, 0, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 2, 0, 2 }, { 2, 0, 4 }, { 0, 0, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 2, 0, 2 }, { 2, 2, 2 }, { 2, 0, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 2, 2, 2 }, { 2, 2, 4 }, { 2, 0, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 2, 2 }, { 0, 2, 4 }, { 2, 2, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 2, 2 }, { 2, 2, 4 }, { 2, 2, 2 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 0, 4 }, { 0, 2, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 2, 4 }, { 0, 2, 2 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 0, 4 }, { 2, 0, 4 }, { 2, 2, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 0, 4 }, { 2, 2, 4 }, { 0, 2, 4 }, 0x0099 });
+		*/
 
-		shape.AddTriangle({ { 0, -10, 0 }, { 0, 0, 0 }, { 1, -10, 0 } });
-		shape.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 1, -10, 0 } });
-		shape.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 } });
-		shape.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 } });
-		shape.AddTriangle({ { 1, -10, 0 }, { 1, 0, 0 }, { 1, -10, 1 } });
-		shape.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 1, -10, 1 } });
-		shape.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 1, 0, 1 } });
-		shape.AddTriangle({ { 0, 0, 0 }, { 1, 0, 1 }, { 1, 0, 0 } });
-		shape.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 0, 1 } });
-		shape.AddTriangle({ { 0, -10, 0 }, { 0, 0, 1 }, { 0, 0, 0 } });
-		shape.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 0, 1 } });
-		shape.AddTriangle({ { 0, -10, 1 }, { 1, 0, 1 }, { 0, 0, 1 } });
+		//1x20x1 Pole (Rainbow)
+		/*
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 0 }, { 1, -10, 0 }, 0x0066 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, -10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 }, 0x0055 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 }, 0x0044 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, 10, 0 }, { 1, -10, 1 }, 0x0033 });
+		shape1.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, -10, 1 }, 0x0022 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 }, 0x0011 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 }, 0x0000 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 10, 1 }, 0x0099 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 1 }, { 0, 10, 0 }, 0x00AA });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 10, 1 }, 0x00BB });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, 10, 1 }, { 0, 10, 1 }, 0x00CC });
+		*/
+
+		//1x20x1 Pole
+		/*
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 0 }, { 1, -10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, -10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, 10, 0 }, { 1, -10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, -10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 1 }, { 0, 10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, 10, 1 }, { 0, 10, 1 }, 0x0077 });
+		*/
+
+		//20x 1x1x1 Cubes (In shape of 1x20x1 pole)
+		/*
+		float b = -10;
+		float t = -9;
+		for (int i = 0; i < 20; i++)
+		{
+			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 0 + 2, t, 0 }, { 1 + 2, b, 0 }, 0x0066 });
+			shape2.AddTriangle({ { 0 + 2, t, 0 }, { 1 + 2, t, 0 }, { 1 + 2, b, 0 }, 0x0077 });
+			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 1 + 2, b, 0 }, { 0 + 2, b, 1 }, 0x0055 });
+			shape2.AddTriangle({ { 1 + 2, b, 0 }, { 1 + 2, b, 1 }, { 0 + 2, b, 1 }, 0x0044 });
+			shape2.AddTriangle({ { 1 + 2, b, 0 }, { 1 + 2, t, 0 }, { 1 + 2, b, 1 }, 0x0033 });
+			shape2.AddTriangle({ { 1 + 2, t, 0 }, { 1 + 2, t, 1 }, { 1 + 2, b, 1 }, 0x0022 });
+			shape2.AddTriangle({ { 0 + 2, t, 0 }, { 0 + 2, t, 1 }, { 1 + 2, t, 1 }, 0x0011 });
+			shape2.AddTriangle({ { 0 + 2, t, 0 }, { 1 + 2, t, 1 }, { 1 + 2, t, 0 }, 0x0000 });
+			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 0 + 2, b, 1 }, { 0 + 2, t, 1 }, 0x0099 });
+			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 0 + 2, t, 1 }, { 0 + 2, t, 0 }, 0x00AA });
+			shape2.AddTriangle({ { 0 + 2, b, 1 }, { 1 + 2, b, 1 }, { 1 + 2, t, 1 }, 0x00BB });
+			shape2.AddTriangle({ { 0 + 2, b, 1 }, { 1 + 2, t, 1 }, { 0 + 2, t, 1 }, 0x00CC });
+			b++;
+			t++;
+		}
+		*/
+
+		//2x 1x10x1 Pole
+		/*
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 10, 0 }, { 1, 0, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, 0, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 10, 0 }, { 1, 0, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, 0, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 10, 1 }, { 0, 10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 10, 1 }, { 0, 10, 1 }, 0x0077 });
+
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 0, 0 }, { 1, -10, 0 }, 0x0066 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 1, -10, 0 }, 0x0066 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, 0, 0 }, { 1, -10, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 1, -10, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 1, 0, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 1 }, { 1, 0, 0 }, 0x0066 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 0, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 0, 1 }, { 0, 0, 0 }, 0x0066 });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 0, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, 0, 1 }, { 0, 0, 1 }, 0x0066 });
+		*/
+
+		//Donut
+		/*
+		shape4.AddTriangle({ { 5.2 - 5.5, -1.0 + 3, 0 }, { 5.8 - 5.5, -1.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 0 }, { 6.2 - 5.5, -1.2 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 0 }, { 6.5 - 5.5, -1.4 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -1.4 + 3, 0 }, { 6.8 - 5.5, -1.8 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 0 }, { 7.0 - 5.5, -2.6 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 0 }, { 7.0 - 5.5, -3.4 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -3.4 + 3, 0 }, { 6.8 - 5.5, -4.2 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -4.2 + 3, 0 }, { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.2 - 5.5, -4.8 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 0 }, { 5.8 - 5.5, -5.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -5.0 + 3, 0 }, { 5.2 - 5.5, -5.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 0 }, { 4.8 - 5.5, -4.8 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 0 }, { 4.5 - 5.5, -4.6 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -4.6 + 3, 0 }, { 4.2 - 5.5, -4.2 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 0 }, { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.0 - 5.5, -2.6 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -2.6 + 3, 0 }, { 4.2 - 5.5, -1.8 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 0 }, { 4.5 - 5.5, -1.4 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -1.4 + 3, 0 }, { 4.8 - 5.5, -1.2 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 0 }, { 5.2 - 5.5, -1.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.7 - 5.5, -1.8 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 1 }, { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.2 - 5.5, -2.4 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 1 }, { 6.2 - 5.5, -3.6 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.0 - 5.5, -4.0 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 1 }, { 5.7 - 5.5, -4.2 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.3 - 5.5, -4.2 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 1 }, { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 5.0 - 5.5, -2.0 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 5.3 - 5.5, -1.8 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -2.6 + 3, 0 }, { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 0 }, { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -1.4 + 3, 0 }, { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 0 }, { 4.8 - 5.5, -1.2 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -1.0 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -1.0 + 3, 0 }, { 5.2 - 5.5, -1.0 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 0 }, { 5.8 - 5.5, -1.0 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 0 }, { 6.2 - 5.5, -1.2 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -1.4 + 3, 0 }, { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 0 }, { 6.8 - 5.5, -1.8 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 0 }, { 7.0 - 5.5, -2.6 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -3.4 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -3.4 + 3, 0 }, { 7.0 - 5.5, -3.4 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -4.2 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -4.2 + 3, 0 }, { 6.8 - 5.5, -4.2 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 0 }, { 6.2 - 5.5, -4.8 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -5.0 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -5.0 + 3, 0 }, { 5.8 - 5.5, -5.0 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 0 }, { 5.2 - 5.5, -5.0 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 0 }, { 4.8 - 5.5, -4.8 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -4.6 + 3, 0 }, { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 0 }, { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 1 }, { 5.7 - 5.5, -1.8 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.0 - 5.5, -2.0 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 1 }, { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 1 }, { 6.0 - 5.5, -4.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.7 - 5.5, -4.2 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 1 }, { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 5.0 - 5.5, -4.0 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.8 - 5.5, -3.6 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.8 - 5.5, -2.4 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 5.0 - 5.5, -2.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 1 }, 0x0055 });
 		*/
 	}
 
@@ -1355,14 +1549,20 @@ public:
 		//Near and far planes too
 
 		//std::vector<Triangle> newTriangles = shape.triangles;
-		std::vector<Triangle> newTriangles = ClipTriangles(4, shape.triangles, pos, inBounds);
+		std::vector<Triangle> newTriangles = ClipTriangles(4, shape1.triangles, pos, inBounds);
 		std::vector<Triangle> addVector = ClipTriangles(4, shape2.triangles, pos, inBounds);
+		newTriangles.insert(newTriangles.end(), addVector.begin(), addVector.end());
+		addVector = ClipTriangles(4, shape3.triangles, pos, inBounds);
+		newTriangles.insert(newTriangles.end(), addVector.begin(), addVector.end());
+		addVector = ClipTriangles(4, shape4.triangles, pos, inBounds);
+		newTriangles.insert(newTriangles.end(), addVector.begin(), addVector.end());
+		addVector = ClipTriangles(4, shape5.triangles, pos, inBounds);
 		newTriangles.insert(newTriangles.end(), addVector.begin(), addVector.end());
 		for (Triangle t : newTriangles)
 		{
 			if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - pos) > 0)
 			{
-				//Backface culling
+				//Backface culling (This isn't a TODO, skipping the triangle like this is the backface culling)
 				continue;
 			}
 			cmde::VEC3F vertices[3];
@@ -1399,7 +1599,7 @@ public:
 					*/
 
 					vertices[i] = ScreenPosToPoint((hAngle / fov.x), (vAngle / fov.y));
-					vertices[i].z = Magnitude(temp);
+					vertices[i].z = (Magnitude(temp) - nearPlane) / (farPlane - nearPlane);
 				}
 				else
 				{
@@ -1411,8 +1611,6 @@ public:
 					temp = { DotProduct(temp, left), DotProduct(temp, up), DotProduct(temp, forwards) };
 					vertices[i] = (ProjectionMatrixify(temp, farPlane, nearPlane) + cmde::VEC2F(1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
 					vertices[i].z = (temp.z - nearPlane) / (farPlane - nearPlane);
-					/////<summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one<\summary>
-					//float DepthConversion(float depth) { (return depth * farPlane) / (depth * (farPlane - nearPlane) + nearPlane); }
 				}
 			}
 			if (wireframe == true)
@@ -1429,35 +1627,35 @@ public:
 			{
 				/*
 				if (t.visibleSides[0] == true)
-					DrawLine(vertices[0], vertices[1], 0x0000, 0x2588, vertices[0].z, vertices[1].z);
+					DrawLine(vertices[0], vertices[1], t.color, 0x2588, vertices[0].z, vertices[1].z);
 				if (t.visibleSides[1] == true)
-					DrawLine(vertices[1], vertices[2], 0x0000, 0x2588, vertices[1].z, vertices[2].z);
+					DrawLine(vertices[1], vertices[2], t.color, 0x2588, vertices[1].z, vertices[2].z);
 				if (t.visibleSides[2] == true)
-					DrawLine(vertices[2], vertices[0], 0x0000, 0x2588, vertices[2].z, vertices[0].z);
+					DrawLine(vertices[2], vertices[0], t.color, 0x2588, vertices[2].z, vertices[0].z);
 				*/
-				DrawTriangle(vertices[0], vertices[1], vertices[2], 0x000F, 0x2588, vertices[0].z, vertices[1].z, vertices[2].z);
+				DrawTriangle(vertices[0], vertices[1], vertices[2], t.color, 0x2588, vertices[0].z, vertices[1].z, vertices[2].z);
 			}
 
 			//tempCounter = swprintf(print, 128, L"(%f, %f)", vertices[0].x, vertices[0].y);
 			//WriteText((vertices[0].x > 0 ? vertices[0].x : 0), vertices[0].y - 1, print, tempCounter);
 		}
-		
 
-		pos = pos + forwards * (inputs[L'w'] >= 2 ? 0.005f : 0);
-		pos = pos + left * (inputs[L'a'] >= 2 ? 0.005f : 0);
-		pos = pos + forwards * (inputs[L's'] >= 2 ? -0.005f : 0);
-		pos = pos + left * (inputs[L'd'] >= 2 ? -0.005f : 0);
-		pos = pos + up * (inputs[L'q'] >= 2 ? -0.005f : 0);
-		pos = pos + up * (inputs[L'e'] >= 2 ? 0.005f : 0);
+
+		pos = pos + forwards * (inputs[L'w'] >= 2 ? 0.05f : 0);
+		pos = pos + left * (inputs[L'a'] >= 2 ? 0.05f : 0);
+		pos = pos + forwards * (inputs[L's'] >= 2 ? -0.05f : 0);
+		pos = pos + left * (inputs[L'd'] >= 2 ? -0.05f : 0);
+		pos = pos + up * (inputs[L'q'] >= 2 ? -0.05f : 0);
+		pos = pos + up * (inputs[L'e'] >= 2 ? 0.05f : 0);
 		if (inputs[L'r'] == 2)
 		{
 			myRenderingSystem = !myRenderingSystem;
 		}
 
-		facing.x += (inputs[MOUSE_X] > 200 ? -0.2f : 0); // right
-		facing.x += (inputs[MOUSE_X] < 50 ? 0.2f : 0); // left
-		facing.y += (inputs[MOUSE_Y] > 200 ? -0.2f : 0); // bottom
-		facing.y += (inputs[MOUSE_Y] < 50 ? 0.2f : 0); // top
+		facing.x += (inputs[MOUSE_X] > 200 ? -0.4f : 0); // right
+		facing.x += (inputs[MOUSE_X] < 50 ? 0.4f : 0); // left
+		facing.y += (inputs[MOUSE_Y] > 200 ? -0.4f : 0); // bottom
+		facing.y += (inputs[MOUSE_Y] < 50 ? 0.4f : 0); // top
 
 		//X+ is left when Z+ is forwards and Y+ is up
 		forwards = VectorFromAngles(facing.x, facing.y);	//  0,  0,  1
@@ -1466,13 +1664,12 @@ public:
 		sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 
+		/*
 		for (short i = 0; i < screenSize.Y; i++)
 		{
 			tempCounter = swprintf(print, 128, L"D: %f", zBuffer[i * screenSize.X + 10]);
 			WriteText(10, i, print, tempCounter);
 		}
-
-		/*
 		tempCounter = swprintf(print, 128, L"X: %f | Y: %f | Z: %f", pos.x, pos.y, pos.z);
 		WriteText(0, 0, print, tempCounter);
 		tempCounter = swprintf(print, 128, L"H: %f | V: %f", facing.x, facing.y);
@@ -1487,6 +1684,694 @@ public:
 		tempCounter = swprintf(print, 128, L"sll: (%f, %f, %f)", sightLimitL.x, sightLimitL.y, sightLimitL.z);
 		WriteText(0, 5, print, tempCounter);
 		cmde::VEC3F slr = forwards * DotProduct(sightLimitL, forwards) - left * DotProduct(sightLimitL, left);
+		tempCounter = swprintf(print, 128, L"slr: (%f, %f, %f)", slr.x, slr.y, slr.z);
+		WriteText(0, 6, print, tempCounter);
+		*/
+	}
+};
+
+class Test3D : public cmde::CMDEngine
+{
+	struct Triangle
+	{
+		cmde::VEC3F vertices[3];
+		bool visibleSides[3];
+		short color;
+
+		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3, short col = 0x00FF)
+		{
+			vertices[0] = p1;
+			vertices[1] = p2;
+			vertices[2] = p3;
+			visibleSides[0] = true;
+			visibleSides[1] = true;
+			visibleSides[2] = true;
+			color = col;
+		}
+
+		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3, short col, bool s1, bool s2, bool s3)
+		{
+			vertices[0] = p1;
+			vertices[1] = p2;
+			vertices[2] = p3;
+			visibleSides[0] = s1;
+			visibleSides[1] = s2;
+			visibleSides[2] = s3;
+			color = col;
+		}
+	};
+
+	struct Mesh
+	{
+		std::vector<Triangle> triangles;
+		cmde::VEC3F aabb[2];
+		cmde::VEC3F center;
+
+		Mesh(std::vector<Triangle> triangles = std::vector<Triangle>())
+		{
+			this->triangles = triangles;
+
+			for (Triangle& t : triangles)
+			{
+				for (short i = 0; i < 3; i++)
+				{
+					RecalculateAABB(t.vertices[i]);
+				}
+			}
+		}
+
+		void RecalculateAABB(cmde::VEC3F p)
+		{
+			aabb[0].x = min(p.x, aabb[0].x);
+			aabb[0].y = min(p.y, aabb[0].y);
+			aabb[0].z = min(p.z, aabb[0].z);
+			aabb[1].x = max(p.x, aabb[1].x);
+			aabb[1].y = max(p.y, aabb[1].y);
+			aabb[1].z = max(p.z, aabb[1].z);
+			center = aabb[0] + (aabb[1] - aabb[0]) * 0.5f;
+		}
+		void AddTriangle(Triangle t) { triangles.push_back(t); }
+		void AddTriangles(std::vector<Triangle> triangles) { this->triangles.insert(this->triangles.end(), triangles.begin(), triangles.end()); }
+	};
+
+	struct Camera
+	{
+		cmde::VEC3F position;
+		cmde::VEC2F facing;
+		cmde::VEC3F left;
+		cmde::VEC3F forwards;
+		cmde::VEC3F up;
+		cmde::VEC3F sightLimitL;
+		cmde::VEC3F sightLimitT;
+		cmde::VEC2F fov;
+		float nearPlane;
+		float farPlane;
+		cmde::VEC3F* inBounds;
+		COORD screenSize;
+
+						///<summary>There must be a default constructor or computer gets mad (This should be unusable though)</summary>
+		Camera()
+		{
+			farPlane = -1;
+			nearPlane = -1;
+			screenSize = COORD();
+			UpdateInBounds();
+		}
+
+		Camera(cmde::VEC3F position, cmde::VEC2F facing, cmde::VEC2F fov, float nearPlane, float farPlane, COORD screenSize)
+		{
+			this->position = position;
+			this->left = left;
+			this->forwards = forwards;
+			this->up = up;
+			this->sightLimitL = sightLimitL;
+			this->sightLimitT = sightLimitT;
+			this->fov = fov;
+			this->nearPlane = nearPlane;
+			this->farPlane = farPlane;
+			this->screenSize = screenSize;
+			UpdateInBounds();
+			UpdateRotation();
+		}
+
+		void UpdateInBounds()
+		{
+			cmde::VEC3F slr = left * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
+			cmde::VEC3F slb = up * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
+			inBounds = new cmde::VEC3F[]{ CrossProduct(sightLimitL, up), CrossProduct(left, sightLimitT), CrossProduct(up, slr), CrossProduct(slb, left) };
+		}
+
+		void RenderShapeSpherical(Mesh m, CMDEngine* ce, bool wireframe = false)
+		{
+			UpdateInBounds();
+			std::vector<Triangle> newTriangles = ClipTriangles(4, m.triangles, position, inBounds);
+			for (Triangle t : newTriangles)
+			{
+				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - position) > 0)
+				{
+					//Backface culling (This isn't a TODO, skipping the triangle like this is the backface culling)
+					continue;
+				}
+				cmde::VEC3F vertices[3];
+				for (int i = 0; i < 3; i++)
+				{
+					ce->DrawLine({ 0, 0 }, { 2, 0 });
+					ce->DrawLine({ 0, 2 }, { 2, 2 });
+					ce->DrawLine({ 0, 4 }, { 2, 4 });
+					ce->Draw(0.0f, 1.0f);
+					ce->Draw(2.0f, 3.0f);
+					cmde::VEC3F temp = t.vertices[i] - position;
+					cmde::VEC3F hTemp = forwards * DotProduct(temp, forwards);
+					cmde::VEC3F vTemp = hTemp + up * DotProduct(temp, up);
+					hTemp = hTemp + left * DotProduct(temp, left);
+					float hAngle = Angle(hTemp, sightLimitL);
+					float vAngle = Angle(vTemp, sightLimitT);
+
+					vertices[i] = ce->ScreenPosToPoint((hAngle / fov.x), (vAngle / fov.y));
+					vertices[i].z = (Magnitude(temp) - nearPlane) / (farPlane - nearPlane);
+				}
+				if (wireframe == true)
+				{
+					short color = (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) < 0 ? 0x00EE : 0x00BB);
+					if (t.visibleSides[0] == true)
+						ce->DrawLine(vertices[0], vertices[1], color, 0x2588, vertices[0].z, vertices[1].z);
+					if (t.visibleSides[1] == true)
+						ce->DrawLine(vertices[1], vertices[2], color, 0x2588, vertices[1].z, vertices[2].z);
+					if (t.visibleSides[2] == true)
+						ce->DrawLine(vertices[2], vertices[0], color, 0x2588, vertices[2].z, vertices[0].z);
+				}
+				else
+				{
+					ce->DrawTriangle(vertices[0], vertices[1], vertices[2], t.color, 0x2588, vertices[0].z, vertices[1].z, vertices[2].z);
+				}
+			}
+		}
+
+		void RenderShapeProjection(Mesh m, CMDEngine* ce, bool wireframe = false)
+		{
+			UpdateInBounds();
+			std::vector<Triangle> newTriangles = ClipTriangles(4, m.triangles, position, inBounds);
+			for (Triangle t : newTriangles)
+			{
+				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - position) > 0)
+				{
+					//Backface culling (This isn't a TODO, skipping the triangle like this is the backface culling)
+					continue;
+				}
+				cmde::VEC3F vertices[3];
+				for (int i = 0; i < 3; i++)
+				{
+					ce->DrawLine({ 0, 0 }, { 2, 0 });
+					ce->DrawLine({ 0, 2 }, { 2, 2 });
+					ce->DrawLine({ 0, 0 }, { 0, 4 });
+					ce->Draw(2.0f, 1.0f);
+					cmde::VEC3F temp = t.vertices[i] - position;
+					temp = { DotProduct(temp, left), DotProduct(temp, up), DotProduct(temp, forwards) };
+					vertices[i] = (ProjectionMatrixify(temp, farPlane, nearPlane, screenSize) + cmde::VEC2F(1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
+					vertices[i].z = (temp.z - nearPlane) / (farPlane - nearPlane);
+				}
+				if (wireframe == true)
+				{
+					short color = (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) < 0 ? 0x00EE : 0x00BB);
+					if (t.visibleSides[0] == true)
+						ce->DrawLine(vertices[0], vertices[1], color, 0x2588, vertices[0].z, vertices[1].z);
+					if (t.visibleSides[1] == true)
+						ce->DrawLine(vertices[1], vertices[2], color, 0x2588, vertices[1].z, vertices[2].z);
+					if (t.visibleSides[2] == true)
+						ce->DrawLine(vertices[2], vertices[0], color, 0x2588, vertices[2].z, vertices[0].z);
+				}
+				else
+				{
+					ce->DrawTriangle(vertices[0], vertices[1], vertices[2], t.color, 0x2588, vertices[0].z, vertices[1].z, vertices[2].z);
+				}
+			}
+		}
+
+		void UpdateRotation()
+		{
+			//X+ is left when Z+ is forwards and Y+ is up
+			forwards = VectorFromAngles(facing.x, facing.y);	//  0,  0,  1
+			left = VectorFromAngles(facing.x + 90, 0);			//  1,  0,  0
+			up = VectorFromAngles(facing.x, facing.y + 90);		//  0,  1,  0
+			sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
+			sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
+		}
+	};
+
+	static bool LinePlaneIntersection(cmde::VEC3F planePoint, cmde::VEC3F planeNormal, cmde::VEC3F lineOrigin, cmde::VEC3F lineDirection, cmde::VEC3F* output)
+	{
+		planeNormal = Normalize(planeNormal);
+		float nd = DotProduct(planeNormal, lineDirection);
+		if (nd == 0)
+			return false;
+		//t = (N * a - N * O) / nd
+		float t = (DotProduct(planeNormal, planePoint) - DotProduct(planeNormal, lineOrigin)) / nd;
+		*output = lineOrigin + lineDirection * t;
+		return true;
+	}
+
+	static std::vector<Triangle> ClipTriangles(short tempInBoundsCount, std::vector<Triangle> ts, cmde::VEC3F cameraPos, cmde::VEC3F inBounds[6])
+	{
+		//'i' SHOULD BE THE AMOUNT OF 'inBounds' THERE ARE (6), BUT I'VE ONLY GOT 4 SO FAR
+		for (short i = 0; i < tempInBoundsCount; i++)
+		{
+			std::vector<Triangle> temp;
+			for (Triangle& t : ts)
+			{
+				std::vector<Triangle> o = ClipTriangle(t, cameraPos, inBounds[i]);
+				temp.insert(temp.end(), o.begin(), o.end());
+			}
+			ts = temp;
+		}
+		return ts;
+	}
+
+	static std::vector<Triangle> ClipTriangle(Triangle t, cmde::VEC3F cameraPos, cmde::VEC3F inBounds)
+	{
+		bool oob[3] = { false };
+		short c = 0;
+		std::vector<Triangle> output = std::vector<Triangle>();
+		for (short i = 0; i < 3; i++)
+		{
+			if (DotProduct(t.vertices[i] - cameraPos, inBounds) < 0)
+			{
+				oob[i] = true;
+				c++;
+			}
+		}
+
+		//Apparently the inside of a switch is all considered the same scope, so you can't have 2 variables with the same name in different cases
+		cmde::VEC3F g;
+		cmde::VEC3F g1;
+		cmde::VEC3F g2;
+		cmde::VEC3F new1;
+		cmde::VEC3F new2;
+		//Must flip the booleans around if c is 2 because then the one that is inside the bounds is the one that's needed
+		if (c == 2)
+		{
+			for (short i = 0; i < 3; i++)
+			{
+				oob[i] = !oob[i];
+			}
+		}
+		short o = 0;
+		for (short i = 0; i < 3; i++)
+		{
+			if (oob[i] == true)
+			{
+				o = i;
+				g = t.vertices[i];
+				g1 = t.vertices[(i + 1) % 3];
+				g2 = t.vertices[(i + 2) % 3];
+				break;
+			}
+		}
+		LinePlaneIntersection(cameraPos, inBounds, g, g1 - g, &new1);
+		LinePlaneIntersection(cameraPos, inBounds, g, g2 - g, &new2);
+
+		switch (c)
+		{
+		case 0:
+			output.push_back(t);
+			break;
+		case 3:
+			//nothing
+			break;
+		case 1:
+			output.push_back(Triangle(new1, g1, g2, t.color, true && t.visibleSides[o], true && t.visibleSides[(o + 1) % 3], false));
+			output.push_back(Triangle(new1, g2, new2, t.color, false, true && t.visibleSides[(o + 2) % 3], false));
+			break;
+		case 2:
+			output.push_back(Triangle(g, new1, new2, t.color, true && t.visibleSides[o], false, true && t.visibleSides[(o + 2) % 3]));
+			break;
+		}
+		return output;
+	}
+
+	cmde::VEC2F ProjectionMatrixify(cmde::VEC3F v, float farPlane, float nearPlane)
+	{
+		float fov = 90.0f;
+		float f = 1.0f / tanf(fov * 0.5f * RAD);
+		if (v.z != 0)
+			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / -v.z, (f * v.y) / -v.z };
+		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y) };
+	}
+
+	static cmde::VEC2F ProjectionMatrixify(cmde::VEC3F v, float farPlane, float nearPlane, COORD screenSize)
+	{
+		float fov = 90.0f;
+		float f = 1.0f / tanf(fov * 0.5f * RAD);
+		if (v.z != 0)
+			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / -v.z, (f * v.y) / -v.z };
+		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y) };
+	}
+
+	///<summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one<\summary>
+	float DepthConversion(float depth)
+	{
+		return (depth * camera.farPlane) / (depth * (camera.farPlane - camera.nearPlane) + camera.nearPlane);
+	}
+
+public:
+	Mesh shape1;
+	Mesh shape2;
+	Mesh shape3;
+	Mesh shape4;
+	Mesh shape5;
+	Camera camera;
+	bool myRenderingSystem;
+	bool wireframe;
+
+
+	Test3D(short screenWidth, short screenHeight, short fontWidth, short fontHeight) : cmde::CMDEngine(screenWidth, screenHeight, fontWidth, fontHeight, true, true, FPS60)
+	{
+		shape1 = Mesh();
+		shape2 = Mesh();
+		shape3 = Mesh();
+		shape4 = Mesh();
+		shape5 = Mesh();
+		myRenderingSystem = false;
+		wireframe = false;
+		emptyChar.Attributes = 0x0088;
+		camera = Camera(
+			{ 0.5f, 0.5f, -2 }, //pos
+			{ 0, 0 }, //facing
+			{ 90, 90 }, //fov
+			0.1f, //nearPlane
+			200.0f, //farPlane
+			screenSize //screenSize
+		);
+	}
+
+	void Setup()
+	{
+		//1x1x1 Cube (with outline)
+		/*
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, true, false, true });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 }, true, true, false });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, true, false, true });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, true, true, false });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 1, 0 }, { 1, 0, 1 }, true, false, true });
+		shape1.AddTriangle({ { 1, 1, 0 }, { 1, 1, 1 }, { 1, 0, 1 }, true, true, false });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 0, 1, 1 }, { 1, 1, 1 }, true, true, false });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 1 }, { 1, 1, 0 }, false, true, true });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 1 }, true, true, false });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 }, false, true, true });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, true, true, false });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 }, false, true, true });
+		*/
+
+		//1x1x1 Cube
+		/*
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 1, 0 }, { 1, 0, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 1, 1, 0 }, { 1, 1, 1 }, { 1, 0, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 0, 1, 1 }, { 1, 1, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 1 }, { 1, 1, 0 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, 0x00AA });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 }, 0x00AA });
+		*/
+
+		//2x2x2 Cube (With Z+2 offset)
+		/*
+		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 2, 2 }, { 2, 0, 2 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 2, 2 }, { 2, 2, 2 }, { 2, 0, 2 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 0, 2 }, { 2, 0, 2 }, { 0, 0, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 2, 0, 2 }, { 2, 0, 4 }, { 0, 0, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 2, 0, 2 }, { 2, 2, 2 }, { 2, 0, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 2, 2, 2 }, { 2, 2, 4 }, { 2, 0, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 2, 2 }, { 0, 2, 4 }, { 2, 2, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 2, 2 }, { 2, 2, 4 }, { 2, 2, 2 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 0, 4 }, { 0, 2, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 2, 4 }, { 0, 2, 2 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 0, 4 }, { 2, 0, 4 }, { 2, 2, 4 }, 0x0099 });
+		shape2.AddTriangle({ { 0, 0, 4 }, { 2, 2, 4 }, { 0, 2, 4 }, 0x0099 });
+		*/
+
+		//1x20x1 Pole (Rainbow)
+		/*
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 0 }, { 1, -10, 0 }, 0x0066 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, -10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 }, 0x0055 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 }, 0x0044 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, 10, 0 }, { 1, -10, 1 }, 0x0033 });
+		shape1.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, -10, 1 }, 0x0022 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 }, 0x0011 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 }, 0x0000 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 10, 1 }, 0x0099 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 1 }, { 0, 10, 0 }, 0x00AA });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 10, 1 }, 0x00BB });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, 10, 1 }, { 0, 10, 1 }, 0x00CC });
+		*/
+
+		//1x20x1 Pole
+		/*
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 0 }, { 1, -10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, -10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, 10, 0 }, { 1, -10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, -10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 1 }, { 0, 10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, 10, 1 }, { 0, 10, 1 }, 0x0077 });
+		*/
+
+		//20x 1x1x1 Cubes (In shape of 1x20x1 pole)
+		/*
+		float b = -10;
+		float t = -9;
+		for (int i = 0; i < 20; i++)
+		{
+			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 0 + 2, t, 0 }, { 1 + 2, b, 0 }, 0x0066 });
+			shape2.AddTriangle({ { 0 + 2, t, 0 }, { 1 + 2, t, 0 }, { 1 + 2, b, 0 }, 0x0077 });
+			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 1 + 2, b, 0 }, { 0 + 2, b, 1 }, 0x0055 });
+			shape2.AddTriangle({ { 1 + 2, b, 0 }, { 1 + 2, b, 1 }, { 0 + 2, b, 1 }, 0x0044 });
+			shape2.AddTriangle({ { 1 + 2, b, 0 }, { 1 + 2, t, 0 }, { 1 + 2, b, 1 }, 0x0033 });
+			shape2.AddTriangle({ { 1 + 2, t, 0 }, { 1 + 2, t, 1 }, { 1 + 2, b, 1 }, 0x0022 });
+			shape2.AddTriangle({ { 0 + 2, t, 0 }, { 0 + 2, t, 1 }, { 1 + 2, t, 1 }, 0x0011 });
+			shape2.AddTriangle({ { 0 + 2, t, 0 }, { 1 + 2, t, 1 }, { 1 + 2, t, 0 }, 0x0000 });
+			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 0 + 2, b, 1 }, { 0 + 2, t, 1 }, 0x0099 });
+			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 0 + 2, t, 1 }, { 0 + 2, t, 0 }, 0x00AA });
+			shape2.AddTriangle({ { 0 + 2, b, 1 }, { 1 + 2, b, 1 }, { 1 + 2, t, 1 }, 0x00BB });
+			shape2.AddTriangle({ { 0 + 2, b, 1 }, { 1 + 2, t, 1 }, { 0 + 2, t, 1 }, 0x00CC });
+			b++;
+			t++;
+		}
+		*/
+
+		//2x 1x10x1 Pole
+		/*
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 10, 0 }, { 1, 0, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, 0, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 10, 0 }, { 1, 0, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, 0, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 10, 1 }, { 0, 10, 0 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 10, 1 }, 0x0077 });
+		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 10, 1 }, { 0, 10, 1 }, 0x0077 });
+
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 0, 0 }, { 1, -10, 0 }, 0x0066 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 1, -10, 0 }, 0x0066 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 1, -10, 0 }, { 1, 0, 0 }, { 1, -10, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 1, -10, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 1, 0, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 1 }, { 1, 0, 0 }, 0x0066 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 0, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 0, 1 }, { 0, 0, 0 }, 0x0066 });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 0, 1 }, 0x0066 });
+		shape1.AddTriangle({ { 0, -10, 1 }, { 1, 0, 1 }, { 0, 0, 1 }, 0x0066 });
+		*/
+
+		//Donut
+		/*
+		shape4.AddTriangle({ { 5.2 - 5.5, -1.0 + 3, 0 }, { 5.8 - 5.5, -1.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 0 }, { 6.2 - 5.5, -1.2 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 0 }, { 6.5 - 5.5, -1.4 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -1.4 + 3, 0 }, { 6.8 - 5.5, -1.8 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 0 }, { 7.0 - 5.5, -2.6 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 0 }, { 7.0 - 5.5, -3.4 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -3.4 + 3, 0 }, { 6.8 - 5.5, -4.2 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -4.2 + 3, 0 }, { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.2 - 5.5, -4.8 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 0 }, { 5.8 - 5.5, -5.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -5.0 + 3, 0 }, { 5.2 - 5.5, -5.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 0 }, { 4.8 - 5.5, -4.8 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 0 }, { 4.5 - 5.5, -4.6 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -4.6 + 3, 0 }, { 4.2 - 5.5, -4.2 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 0 }, { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.0 - 5.5, -2.6 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -2.6 + 3, 0 }, { 4.2 - 5.5, -1.8 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 0 }, { 4.5 - 5.5, -1.4 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -1.4 + 3, 0 }, { 4.8 - 5.5, -1.2 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 0 }, { 5.2 - 5.5, -1.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.7 - 5.5, -1.8 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 1 }, { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.2 - 5.5, -2.4 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 1 }, { 6.2 - 5.5, -3.6 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.0 - 5.5, -4.0 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 1 }, { 5.7 - 5.5, -4.2 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.3 - 5.5, -4.2 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 1 }, { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 5.0 - 5.5, -2.0 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 5.3 - 5.5, -1.8 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -2.6 + 3, 0 }, { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 0 }, { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -1.4 + 3, 0 }, { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 0 }, { 4.8 - 5.5, -1.2 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -1.0 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -1.0 + 3, 0 }, { 5.2 - 5.5, -1.0 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 0 }, { 5.8 - 5.5, -1.0 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 0 }, { 6.2 - 5.5, -1.2 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -1.4 + 3, 0 }, { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 0 }, { 6.8 - 5.5, -1.8 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 0 }, { 7.0 - 5.5, -2.6 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -3.4 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 7.0 - 5.5, -3.4 + 3, 0 }, { 7.0 - 5.5, -3.4 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -4.2 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.8 - 5.5, -4.2 + 3, 0 }, { 6.8 - 5.5, -4.2 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 0 }, { 6.2 - 5.5, -4.8 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -5.0 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.8 - 5.5, -5.0 + 3, 0 }, { 5.8 - 5.5, -5.0 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 0 }, { 5.2 - 5.5, -5.0 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 0 }, { 4.8 - 5.5, -4.8 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.5 - 5.5, -4.6 + 3, 0 }, { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 0 }, { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 1 }, { 5.7 - 5.5, -1.8 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.0 - 5.5, -2.0 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 1 }, { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 1 }, { 6.0 - 5.5, -4.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.7 - 5.5, -4.2 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 1 }, { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 5.0 - 5.5, -4.0 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.8 - 5.5, -3.6 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.8 - 5.5, -2.4 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 5.0 - 5.5, -2.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 1 }, 0x0055 });
+		*/
+	}
+
+	void Update()
+	{
+		wchar_t print[128] = {};
+		int tempCounter = 0;
+
+		camera.UpdateInBounds();
+
+		if (myRenderingSystem == true)
+		{
+			camera.RenderShapeSpherical(shape1, this, wireframe);
+			camera.RenderShapeSpherical(shape2, this, wireframe);
+			camera.RenderShapeSpherical(shape3, this, wireframe);
+			camera.RenderShapeSpherical(shape4, this, wireframe);
+			camera.RenderShapeSpherical(shape5, this, wireframe);
+		}
+		else
+		{
+			camera.RenderShapeProjection(shape1, this, wireframe);
+			camera.RenderShapeProjection(shape2, this, wireframe);
+			camera.RenderShapeProjection(shape3, this, wireframe);
+			camera.RenderShapeProjection(shape4, this, wireframe);
+			camera.RenderShapeProjection(shape5, this, wireframe);
+		}
+
+		camera.position = camera.position + camera.forwards * (inputs[L'w'] >= 2 ? 0.05f : 0);
+		camera.position = camera.position + camera.left * (inputs[L'a'] >= 2 ? 0.05f : 0);
+		camera.position = camera.position + camera.forwards * (inputs[L's'] >= 2 ? -0.05f : 0);
+		camera.position = camera.position + camera.left * (inputs[L'd'] >= 2 ? -0.05f : 0);
+		camera.position = camera.position + camera.up * (inputs[L'q'] >= 2 ? -0.05f : 0);
+		camera.position = camera.position + camera.up * (inputs[L'e'] >= 2 ? 0.05f : 0);
+		if (inputs[L'r'] == 2)
+		{
+			myRenderingSystem = !myRenderingSystem;
+		}
+
+		camera.facing.x += (inputs[MOUSE_X] > 200 ? -0.4f : 0); // right
+		camera.facing.x += (inputs[MOUSE_X] < 50 ? 0.4f : 0); // left
+		camera.facing.y += (inputs[MOUSE_Y] > 200 ? -0.4f : 0); // bottom
+		camera.facing.y += (inputs[MOUSE_Y] < 50 ? 0.4f : 0); // top
+
+		camera.UpdateRotation();
+
+		/* Debug UI
+		for (short i = 0; i < screenSize.Y; i++)
+		{
+			tempCounter = swprintf(print, 128, L"D: %f", zBuffer[i * screenSize.X + 10]);
+			WriteText(10, i, print, tempCounter);
+		}
+		tempCounter = swprintf(print, 128, L"X: %f | Y: %f | Z: %f", camera.position.x, camera.position.y, camera.position.z);
+		WriteText(0, 0, print, tempCounter);
+		tempCounter = swprintf(print, 128, L"H: %f | V: %f", camera.facing.x, camera.facing.y);
+		WriteText(0, 1, print, tempCounter);
+		tempCounter = swprintf(print, 128, L"forwards: (%f, %f, %f)", camera.forwards.x, camera.forwards.y, camera.forwards.z);
+		WriteText(0, 2, print, tempCounter);
+		tempCounter = swprintf(print, 128, L"left: (%f, %f, %f)", camera.left.x, camera.left.y, camera.left.z);
+		WriteText(0, 3, print, tempCounter);
+		tempCounter = swprintf(print, 128, L"up: (%f, %f, %f)", camera.up.x, camera.up.y, camera.up.z);
+		WriteText(0, 4, print, tempCounter);
+
+		tempCounter = swprintf(print, 128, L"sll: (%f, %f, %f)", camera.sightLimitL.x, camera.sightLimitL.y, camera.sightLimitL.z);
+		WriteText(0, 5, print, tempCounter);
+		cmde::VEC3F slr = camera.forwards * DotProduct(camera.sightLimitL, camera.forwards) - camera.left * DotProduct(camera.sightLimitL, camera.left);
 		tempCounter = swprintf(print, 128, L"slr: (%f, %f, %f)", slr.x, slr.y, slr.z);
 		WriteText(0, 6, print, tempCounter);
 		*/
