@@ -82,6 +82,15 @@ namespace cmde
 		VEC2F(VEC4F v) { x = v.x; y = v.y; z = 0; w = 0; }
 	};
 
+	struct PLANE
+	{
+		VEC3F point;
+		VEC3F normal;
+
+		PLANE() { point = normal = VEC3F(); }
+		PLANE(VEC3F p, VEC3F n) { point = p; normal = n; }
+	};
+
 	struct FUNC
 	{
 		virtual VEC4F f(float x) = 0;
@@ -1768,7 +1777,7 @@ class Test3D : public cmde::CMDEngine
 		cmde::VEC2F fov;
 		float nearPlane;
 		float farPlane;
-		cmde::VEC3F* inBounds;
+		cmde::PLANE* inBounds;
 		COORD screenSize;
 
 						///<summary>There must be a default constructor or computer gets mad (This should be unusable though)</summary>
@@ -1800,13 +1809,13 @@ class Test3D : public cmde::CMDEngine
 		{
 			cmde::VEC3F slr = left * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 			cmde::VEC3F slb = up * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
-			inBounds = new cmde::VEC3F[]{ CrossProduct(sightLimitL, up), CrossProduct(left, sightLimitT), CrossProduct(up, slr), CrossProduct(slb, left) };
+			inBounds = new cmde::PLANE[]{ { position, CrossProduct(sightLimitL, up) }, { position, CrossProduct(left, sightLimitT) }, { position, CrossProduct(up, slr) }, { position, CrossProduct(slb, left) }, { forwards * nearPlane + position, forwards }, { forwards * farPlane + position, forwards * -1 } };
 		}
 
 		void RenderShapeSpherical(Object obj, CMDEngine* ce, bool wireframe = false)
 		{
 			UpdateInBounds();
-			std::vector<Triangle> newTriangles = ClipTriangles(4, obj, position, inBounds);
+			std::vector<Triangle> newTriangles = ClipTriangles(obj, position, inBounds);
 			for (Triangle t : newTriangles)
 			{
 				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - position) > 0)
@@ -1852,7 +1861,7 @@ class Test3D : public cmde::CMDEngine
 		void RenderShapeProjection(Object obj, CMDEngine* ce, bool wireframe = false)
 		{
 			UpdateInBounds();
-			std::vector<Triangle> newTriangles = ClipTriangles(4, obj, position, inBounds);
+			std::vector<Triangle> newTriangles = ClipTriangles(obj, position, inBounds);
 			for (Triangle t : newTriangles)
 			{
 				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - position) > 0)
@@ -1869,7 +1878,7 @@ class Test3D : public cmde::CMDEngine
 					ce->Draw(2.0f, 1.0f);
 					cmde::VEC3F temp = t.vertices[i] - position;
 					temp = { DotProduct(temp, left), DotProduct(temp, up), DotProduct(temp, forwards) };
-					vertices[i] = (ProjectionMatrixify(temp, farPlane, nearPlane, screenSize) + cmde::VEC2F(1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
+					vertices[i] = (ProjectionMatrixify(temp, *this) + cmde::VEC2F(1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
 					vertices[i].z = (temp.z - nearPlane) / (farPlane - nearPlane);
 				}
 				if (wireframe == true)
@@ -1900,37 +1909,36 @@ class Test3D : public cmde::CMDEngine
 		}
 	};
 
-	static bool LinePlaneIntersection(cmde::VEC3F planePoint, cmde::VEC3F planeNormal, cmde::VEC3F lineOrigin, cmde::VEC3F lineDirection, cmde::VEC3F* output)
+	static bool LinePlaneIntersection(cmde::PLANE plane, cmde::VEC3F lineOrigin, cmde::VEC3F lineDirection, cmde::VEC3F* output)
 	{
-		planeNormal = Normalize(planeNormal);
-		float nd = DotProduct(planeNormal, lineDirection);
+		plane.normal = Normalize(plane.normal);
+		float nd = DotProduct(plane.normal, lineDirection);
 		if (nd == 0)
 			return false;
 		//t = (N * a - N * O) / nd
-		float t = (DotProduct(planeNormal, planePoint) - DotProduct(planeNormal, lineOrigin)) / nd;
+		float t = (DotProduct(plane.normal, plane.point) - DotProduct(plane.normal, lineOrigin)) / nd;
 		*output = lineOrigin + lineDirection * t;
 		return true;
 	}
 
-	static std::vector<Triangle> ClipTriangles(short tempInBoundsCount, Object obj, cmde::VEC3F cameraPos, cmde::VEC3F inBounds[6])
+	static std::vector<Triangle> ClipTriangles(Object obj, cmde::VEC3F cameraPos, cmde::PLANE inBounds[6])
 	{
 		std::vector<Triangle> triangles = obj.mesh.triangles;
 		for (Triangle& t : triangles)
 		{
 			t = t.GetWithOffset(obj.position);
 		}
-		return ClipTriangles(tempInBoundsCount, triangles, cameraPos, inBounds);
+		return ClipTriangles(triangles, cameraPos, inBounds);
 	}
 
-	static std::vector<Triangle> ClipTriangles(short tempInBoundsCount, std::vector<Triangle> ts, cmde::VEC3F cameraPos, cmde::VEC3F inBounds[6])
+	static std::vector<Triangle> ClipTriangles(std::vector<Triangle> ts, cmde::VEC3F cameraPos, cmde::PLANE inBounds[6])
 	{
-		//'i' SHOULD BE THE AMOUNT OF 'inBounds' THERE ARE (6), BUT I'VE ONLY GOT 4 SO FAR
-		for (short i = 0; i < tempInBoundsCount; i++)
+		for (short i = 0; i < 6; i++)
 		{
 			std::vector<Triangle> temp;
 			for (Triangle& t : ts)
 			{
-				std::vector<Triangle> ct = ClipTriangle(t, cameraPos, inBounds[i]);
+				std::vector<Triangle> ct = ClipTriangle(t, inBounds[i]);
 				temp.insert(temp.end(), ct.begin(), ct.end());
 			}
 			ts = temp;
@@ -1938,14 +1946,14 @@ class Test3D : public cmde::CMDEngine
 		return ts;
 	}
 
-	static std::vector<Triangle> ClipTriangle(Triangle t, cmde::VEC3F cameraPos, cmde::VEC3F inBounds)
+	static std::vector<Triangle> ClipTriangle(Triangle t, cmde::PLANE inBounds)
 	{
 		bool oob[3] = { false };
 		short c = 0;
 		std::vector<Triangle> output = std::vector<Triangle>();
 		for (short i = 0; i < 3; i++)
 		{
-			if (DotProduct(t.vertices[i] - cameraPos, inBounds) < 0)
+			if (DotProduct(t.vertices[i] - inBounds.point, inBounds.normal) < 0)
 			{
 				oob[i] = true;
 				c++;
@@ -1978,8 +1986,8 @@ class Test3D : public cmde::CMDEngine
 				break;
 			}
 		}
-		LinePlaneIntersection(cameraPos, inBounds, g, g1 - g, &new1);
-		LinePlaneIntersection(cameraPos, inBounds, g, g2 - g, &new2);
+		LinePlaneIntersection(inBounds, g, g1 - g, &new1);
+		LinePlaneIntersection(inBounds, g, g2 - g, &new2);
 
 		switch (c)
 		{
@@ -2000,22 +2008,20 @@ class Test3D : public cmde::CMDEngine
 		return output;
 	}
 
-	cmde::VEC2F ProjectionMatrixify(cmde::VEC3F v, float farPlane, float nearPlane)
+	static cmde::VEC2F ProjectionMatrixify(cmde::VEC3F v, Camera camera)
 	{
+		float f1 = 1.0f / tanf(camera.fov.x * 0.5f * RAD);
+		float f2 = 1.0f / tanf(camera.fov.y * 0.5f * RAD);
+		if (v.z != 0)
+			return { (((float)camera.screenSize.Y / (float)camera.screenSize.X) * f1 * v.x) / -v.z, (f2 * v.y) / -v.z };
+		return { (((float)camera.screenSize.Y / (float)camera.screenSize.X) * f1 * v.x), (f2 * v.y) };
+		/*
 		float fov = 90.0f;
 		float f = 1.0f / tanf(fov * 0.5f * RAD);
 		if (v.z != 0)
 			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / -v.z, (f * v.y) / -v.z };
 		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y) };
-	}
-
-	static cmde::VEC2F ProjectionMatrixify(cmde::VEC3F v, float farPlane, float nearPlane, COORD screenSize)
-	{
-		float fov = 90.0f;
-		float f = 1.0f / tanf(fov * 0.5f * RAD);
-		if (v.z != 0)
-			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / -v.z, (f * v.y) / -v.z };
-		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y) };
+		*/
 	}
 
 	///<summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one<\summary>
@@ -2038,6 +2044,7 @@ public:
 	Test3D(short screenWidth, short screenHeight, short fontWidth, short fontHeight) : cmde::CMDEngine(screenWidth, screenHeight, fontWidth, fontHeight, true, true, FPS60)
 	{
 		//1x1x1 Cube
+		///*
 		Mesh cube1 = Mesh(std::vector<Triangle> {
 			{ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, 0x00AA },
 			{ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 }, 0x00AA },
@@ -2052,6 +2059,7 @@ public:
 			{ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, 0x00AA },
 			{ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 }, 0x00AA }
 		});
+		//*/
 
 		//2x2x2 Cube (With Z+2 offset)
 		/*
@@ -2311,7 +2319,7 @@ public:
 		camera = Camera(
 			{ 0.5f, 0.5f, -2 }, //pos
 			{ 0, 0 }, //facing
-			{ 90, 90 }, //fov
+			{ 90, 90 }, //fov (180 causes issues with the math; After 180 it counts as if from 0, but the image is reversed)
 			0.1f, //nearPlane
 			200.0f, //farPlane
 			screenSize //screenSize
@@ -2329,6 +2337,8 @@ public:
 		int printLength = 0;
 
 		camera.UpdateInBounds();
+
+		obj1.position = obj1.position + cmde::VEC3F(1, 0, 0) * deltaTime;
 
 		if (myRenderingSystem == true)
 		{
