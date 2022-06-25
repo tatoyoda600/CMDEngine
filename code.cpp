@@ -82,15 +82,6 @@ namespace cmde
 		VEC2F(VEC4F v) { x = v.x; y = v.y; z = 0; w = 0; }
 	};
 
-	struct PLANE
-	{
-		VEC3F point;
-		VEC3F normal;
-
-		PLANE() { point = normal = VEC3F(); }
-		PLANE(VEC3F p, VEC3F n) { point = p; normal = n; }
-	};
-
 	struct FUNC
 	{
 		virtual VEC4F f(float x) = 0;
@@ -373,18 +364,19 @@ namespace cmde
 						/// <param name="cha">The character with which to draw to that point</param>
 						/// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
 			void Draw(short x, short y, short col = 0x000F, short cha = 0x2588, float depth = -1)
-		{
-			if (OnScreen(x, y) && (depth < 0 || (depth >= 0 && depth < zBuffer[y * screenSize.X + x])))
 			{
-				screen[y * screenSize.X + x].Char.UnicodeChar = cha;
-				screen[y * screenSize.X + x].Attributes = col;
-				zBuffer[y * screenSize.X + x] = depth;
+				if (OnScreen(x, y) && (depth < 0 || (depth >= 0 && depth < zBuffer[y * screenSize.X + x])))
+				{
+					screen[y * screenSize.X + x].Char.UnicodeChar = cha;
+					screen[y * screenSize.X + x].Attributes = col;
+					zBuffer[y * screenSize.X + x] = depth;
+				}
 			}
-		}
+			//Due to issues with numbers between 0-1 when casting, '(short)((short)(x + 2) - 2)' is needed, since numbers between 2-3 convert correctly
 							/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="x">The x position of the point (Leftmost is 0; Rightmost is screenSize.X)</param> /// <param name="y">The y position of the point (Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
-			void Draw(float x, float y, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)x, (short)y, col, cha, depth); }
+			void Draw(float x, float y, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)((short)(x + 2) - 2), (short)((short)(y + 2) - 2), col, cha, depth); }
 							/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="p">The position of the point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
-			void Draw(VEC2F p, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)p.x, (short)p.y, col, cha, depth); }
+			void Draw(VEC2F p, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)((short)(p.x + 2) - 2), (short)((short)(p.y + 2) - 2), col, cha, depth); }
 		#pragma endregion
 
 		//Gets the step size for the reaction in 1 axis when moving 1 unit in the other
@@ -476,7 +468,7 @@ namespace cmde
 		{
 			for (int i = 0; i < length; i++)
 			{
-				Draw(i + x, (short)y, 0x000F, text[i], depth);
+				Draw(i + x, (short)y, col, text[i], depth);
 			}
 		}
 
@@ -565,6 +557,7 @@ namespace cmde
 				Draw(x, y, col, cha, b2Depth.f(y).y);
 			}
 			//+1 on y for line 1 & 2, & +? on x for line 1 & 2
+			//DEBUG
 			for (float y = b1.y + ty, x1 = b1.x + ux1 * abs(ty * sx1), x2 = b2.x + ux2 * abs(ty * sx2); y * uy < t1.y * uy; y += uy, x1 += sx1, x2 += sx2)
 			{
 				DrawLine(x1, y, x2, y, col, cha, b1Depth.f(y).y, b2Depth.f(y).y);
@@ -1701,11 +1694,21 @@ public:
 
 class Test3D : public cmde::CMDEngine
 {
+	struct PLANE
+	{
+		cmde::VEC3F point;
+		cmde::VEC3F normal;
+
+		PLANE() { point = normal = cmde::VEC3F(); }
+		PLANE(cmde::VEC3F p, cmde::VEC3F n) { point = p; normal = Normalize(n); }
+	};
+
 	struct Triangle
 	{
 		cmde::VEC3F vertices[3];
 		bool visibleSides[3];
 		short color;
+		cmde::VEC3F normal;
 
 		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3, short col = 0x00FF)
 		{
@@ -1716,6 +1719,7 @@ class Test3D : public cmde::CMDEngine
 			visibleSides[1] = true;
 			visibleSides[2] = true;
 			color = col;
+			normal = Normalize(CrossProduct(vertices[0] - vertices[1], vertices[2] - vertices[1]));
 		}
 
 		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3, short col, bool s1, bool s2, bool s3)
@@ -1727,6 +1731,7 @@ class Test3D : public cmde::CMDEngine
 			visibleSides[1] = s2;
 			visibleSides[2] = s3;
 			color = col;
+			normal = Normalize(CrossProduct(vertices[0] - vertices[1], vertices[2] - vertices[1]));
 		}
 
 		Triangle GetWithOffset(cmde::VEC3F offset)
@@ -1738,10 +1743,16 @@ class Test3D : public cmde::CMDEngine
 	struct Mesh
 	{
 		std::vector<Triangle> triangles;
+		float radius;
 
 		Mesh(std::vector<Triangle> triangles = std::vector<Triangle>())
 		{
 			this->triangles = triangles;
+			radius = 0;
+			for (Triangle& t : triangles)
+			{
+				radius = max(max(radius, Magnitude(t.vertices[0])), max(Magnitude(t.vertices[1]), Magnitude(t.vertices[2])));
+			}
 		}
 
 		void ChangeColor(short col)
@@ -1777,7 +1788,7 @@ class Test3D : public cmde::CMDEngine
 		cmde::VEC2F fov;
 		float nearPlane;
 		float farPlane;
-		cmde::PLANE* inBounds;
+		PLANE* inBounds;
 		COORD screenSize;
 
 						///<summary>There must be a default constructor or computer gets mad (This should be unusable though)</summary>
@@ -1809,7 +1820,7 @@ class Test3D : public cmde::CMDEngine
 		{
 			cmde::VEC3F slr = left * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 			cmde::VEC3F slb = up * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
-			inBounds = new cmde::PLANE[]{ { position, CrossProduct(sightLimitL, up) }, { position, CrossProduct(left, sightLimitT) }, { position, CrossProduct(up, slr) }, { position, CrossProduct(slb, left) }, { forwards * nearPlane + position, forwards }, { forwards * farPlane + position, forwards * -1 } };
+			inBounds = new PLANE[]{ { position, CrossProduct(sightLimitL, up) }, { position, CrossProduct(left, sightLimitT) }, { position, CrossProduct(up, slr) }, { position, CrossProduct(slb, left) }, { forwards * nearPlane + position, forwards }, { forwards * farPlane + position, forwards * -1 } };
 		}
 
 		void RenderShapeSpherical(Object obj, CMDEngine* ce, bool wireframe = false)
@@ -1907,31 +1918,45 @@ class Test3D : public cmde::CMDEngine
 			sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 			sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		}
+
+		void PostProcessing(std::vector<COORD>* buffer)
+		{
+			for (COORD& b : *buffer)
+			{
+				//POST PROCESSING GOES HERE
+			}
+		}
 	};
 
-	static bool LinePlaneIntersection(cmde::PLANE plane, cmde::VEC3F lineOrigin, cmde::VEC3F lineDirection, cmde::VEC3F* output)
+	static bool RayPlaneIntersection(PLANE plane, cmde::VEC3F origin, cmde::VEC3F direction, cmde::VEC3F* output)
 	{
-		plane.normal = Normalize(plane.normal);
-		float nd = DotProduct(plane.normal, lineDirection);
-		if (nd == 0)
-			return false;
-		//t = (N * a - N * O) / nd
-		float t = (DotProduct(plane.normal, plane.point) - DotProduct(plane.normal, lineOrigin)) / nd;
-		*output = lineOrigin + lineDirection * t;
-		return true;
+			float nd = DotProduct(plane.normal, direction);
+			if (nd == 0)
+				return false;
+			float t = (DotProduct(plane.normal, plane.point - origin) / nd);
+			if (t < 0)
+				return false;
+			*output = origin + direction * t;
+			return true;
 	}
 
-	static std::vector<Triangle> ClipTriangles(Object obj, cmde::VEC3F cameraPos, cmde::PLANE inBounds[6])
+	static bool PointInTriangle(cmde::VEC3F point, Triangle triangle)
 	{
-		std::vector<Triangle> triangles = obj.mesh.triangles;
-		for (Triangle& t : triangles)
+		return (DotProduct(point - triangle.vertices[0], CrossProduct(triangle.vertices[2] - triangle.vertices[0], triangle.normal)) < 0) &&
+			   (DotProduct(point - triangle.vertices[1], CrossProduct(triangle.vertices[0] - triangle.vertices[1], triangle.normal)) < 0) &&
+			   (DotProduct(point - triangle.vertices[2], CrossProduct(triangle.vertices[1] - triangle.vertices[2], triangle.normal)) < 0);
+	}
+
+	static std::vector<Triangle> ClipTriangles(Object obj, cmde::VEC3F cameraPos, PLANE inBounds[6])
+	{
+		for (Triangle& t : obj.mesh.triangles)
 		{
 			t = t.GetWithOffset(obj.position);
 		}
-		return ClipTriangles(triangles, cameraPos, inBounds);
+		return ClipTriangles(obj.mesh.triangles, cameraPos, inBounds);
 	}
 
-	static std::vector<Triangle> ClipTriangles(std::vector<Triangle> ts, cmde::VEC3F cameraPos, cmde::PLANE inBounds[6])
+	static std::vector<Triangle> ClipTriangles(std::vector<Triangle> ts, cmde::VEC3F cameraPos, PLANE inBounds[6])
 	{
 		for (short i = 0; i < 6; i++)
 		{
@@ -1946,7 +1971,7 @@ class Test3D : public cmde::CMDEngine
 		return ts;
 	}
 
-	static std::vector<Triangle> ClipTriangle(Triangle t, cmde::PLANE inBounds)
+	static std::vector<Triangle> ClipTriangle(Triangle t, PLANE inBounds)
 	{
 		bool oob[3] = { false };
 		short c = 0;
@@ -1986,8 +2011,8 @@ class Test3D : public cmde::CMDEngine
 				break;
 			}
 		}
-		LinePlaneIntersection(inBounds, g, g1 - g, &new1);
-		LinePlaneIntersection(inBounds, g, g2 - g, &new2);
+		RayPlaneIntersection(inBounds, g, g1 - g, &new1);
+		RayPlaneIntersection(inBounds, g, g2 - g, &new2);
 
 		switch (c)
 		{
@@ -2015,30 +2040,71 @@ class Test3D : public cmde::CMDEngine
 		if (v.z != 0)
 			return { (((float)camera.screenSize.Y / (float)camera.screenSize.X) * f1 * v.x) / -v.z, (f2 * v.y) / -v.z };
 		return { (((float)camera.screenSize.Y / (float)camera.screenSize.X) * f1 * v.x), (f2 * v.y) };
-		/*
-		float fov = 90.0f;
-		float f = 1.0f / tanf(fov * 0.5f * RAD);
-		if (v.z != 0)
-			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / -v.z, (f * v.y) / -v.z };
-		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y) };
-		*/
 	}
 
-	///<summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one<\summary>
-	float DepthConversion(float depth)
+					///<summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one<\summary>
+	float DepthConversion(float depth) { return (depth * camera.farPlane) / (depth * (camera.farPlane - camera.nearPlane) + camera.nearPlane); }
+					///<summary>Takes a relative depth value where 0 is the near plane and 1 is the far plane, and returns an actual depth value</summary>
+	float DenormalizeDepth(float depth) { return depth * (camera.farPlane - camera.nearPlane) + camera.nearPlane; }
+
+	static std::vector<PLANE> RaycastAll(cmde::VEC3F origin, cmde::VEC3F direction, std::vector<Object>* objects)
 	{
-		return (depth * camera.farPlane) / (depth * (camera.farPlane - camera.nearPlane) + camera.nearPlane);
+		std::vector<PLANE> output;
+		direction = Normalize(direction);
+		for (Object& o : *objects)
+		{
+			cmde::VEC3F nearest = origin + direction * DotProduct(o.position - origin, direction);
+			if (o.mesh.radius >= Magnitude(nearest - o.position))
+			{
+				//Ray passes through this object's bounding sphere (Could possibly collide)
+				for (Triangle t : o.mesh.triangles)
+				{
+					if (DotProduct(t.normal, direction) > 0)
+					{
+						t = t.GetWithOffset(o.position);
+						cmde::VEC3F point = cmde::VEC3F();
+						if (RayPlaneIntersection(PLANE(t.vertices[0], t.normal), origin, direction, &point) == true)
+						{
+							if (PointInTriangle(point, t) == true)
+							{
+								output.push_back(PLANE(point, t.normal));
+							}
+						}
+					}
+				}
+			}
+		}
+		return output;
+	}
+
+	static PLANE Raycast(cmde::VEC3F origin, cmde::VEC3F direction, std::vector<Object>* objects)
+	{
+		PLANE output = PLANE();
+		std::vector<PLANE> hits = RaycastAll(origin, direction, objects);
+		float distance = -1;
+		for (PLANE& p : hits)
+		{
+			float tempDist = Magnitude(p.point - origin);
+			if (tempDist < distance || distance < 0)
+			{
+				distance = tempDist;
+				output = p;
+			}
+		}
+		return output;
 	}
 
 public:
 	Object obj1;
 	Object obj2;
-	Mesh shape3;
+	Object obj3;
 	Mesh shape4;
 	Mesh shape5;
 	Camera camera;
 	bool myRenderingSystem;
 	bool wireframe;
+	std::vector<COORD> postProcessBuffer = {};
+	std::vector<Object> objects = {};
 
 
 	Test3D(short screenWidth, short screenHeight, short fontWidth, short fontHeight) : cmde::CMDEngine(screenWidth, screenHeight, fontWidth, fontHeight, true, true, FPS60)
@@ -2309,8 +2375,11 @@ public:
 		obj1 = Object(cube1, cmde::VEC3F(0, 0, 0));
 		obj1.mesh.ChangeColor(0x00AA);
 		obj2 = Object(cube1, cmde::VEC3F(0, 1, 0));
-		obj2.mesh.ChangeColor(0x00BB);
-		shape3 = Mesh();
+		obj2.mesh.ChangeColor(0x00BB);//0400, 0800, 1000, 2000, and all combos of them are safe (3C00 combines all)
+		objects.push_back(obj1);
+		objects.push_back(obj2);
+		obj3 = Object(Mesh(std::vector<Triangle> { { { 0.1f, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0.1f, 0 }, 0x0003 }, { { 0, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0, 0 }, 0x0003 }}), { 0, 0, 0 });
+		objects.push_back(obj3);
 		shape4 = Mesh();
 		shape5 = Mesh();
 		myRenderingSystem = false;
@@ -2338,24 +2407,40 @@ public:
 
 		camera.UpdateInBounds();
 
-		obj1.position = obj1.position + cmde::VEC3F(1, 0, 0) * deltaTime;
+		//Raycast crosshair
+		PLANE tempPlanes = Raycast(camera.position, camera.forwards, &objects);
+		objects.at(2).mesh = Mesh(std::vector<Triangle> { { { 0.1f, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0.1f, 0 }, 0x0003 }, { { 0, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0, 0 }, 0x0003 }});
+		std::vector<Triangle> tempTriangles = std::vector<Triangle>();
+		cmde::VEC3F tempV1 = Normalize(CrossProduct(tempPlanes.normal, tempPlanes.normal + camera.up));
+		cmde::VEC3F tempV2 = Normalize(CrossProduct(tempPlanes.normal, tempV1));
+		tempTriangles.push_back(Triangle(tempV1 * 0.1f, tempV1 * -1 * 0.1f, tempV2 * 0.1f, 0x0003).GetWithOffset(tempPlanes.point + camera.forwards * -0.1f));
+		tempTriangles.push_back(Triangle(tempV1 * 0.1f, tempV2 * -1 * 0.1f, tempV1 * -1 * 0.1f, 0x0003).GetWithOffset(tempPlanes.point + camera.forwards * -0.1f));
+		tempTriangles.push_back(Triangle(tempV1 * 0.1f, tempV2 * 0.1f, tempV1 * -1 * 0.1f, 0x0003).GetWithOffset(tempPlanes.point + camera.forwards * -0.1f));
+		tempTriangles.push_back(Triangle(tempV1 * 0.1f, tempV1 * -1 * 0.1f, tempV2 * -1 * 0.1f, 0x0003).GetWithOffset(tempPlanes.point + camera.forwards * -0.1f));
+		objects.at(2).mesh = Mesh(tempTriangles);
+
+		//Move object
+		objects.at(0).position = objects.at(0).position + cmde::VEC3F(0.1f, 0, 0) * deltaTime;
 
 		if (myRenderingSystem == true)
 		{
-			camera.RenderShapeSpherical(obj1, this, wireframe);
-			camera.RenderShapeSpherical(obj2, this, wireframe);
-			camera.RenderShapeSpherical(shape3, this, wireframe);
+			camera.RenderShapeSpherical(objects.at(0), this, wireframe);
+			camera.RenderShapeSpherical(objects.at(1), this, wireframe);
+			camera.RenderShapeSpherical(objects.at(2), this, wireframe);
 			camera.RenderShapeSpherical(shape4, this, wireframe);
 			camera.RenderShapeSpherical(shape5, this, wireframe);
 		}
 		else
 		{
-			camera.RenderShapeProjection(obj1, this, wireframe);
-			camera.RenderShapeProjection(obj2, this, wireframe);
-			camera.RenderShapeProjection(shape3, this, wireframe);
+			camera.RenderShapeProjection(objects.at(0), this, wireframe);
+			camera.RenderShapeProjection(objects.at(1), this, wireframe);
+			camera.RenderShapeProjection(objects.at(2), this, wireframe);
 			camera.RenderShapeProjection(shape4, this, wireframe);
 			camera.RenderShapeProjection(shape5, this, wireframe);
 		}
+
+		DrawLineS(cmde::VEC2F(0.495f, 0.5f), cmde::VEC2F(0.51f, 0.5f), 0x00FF);
+		DrawLineS(cmde::VEC2F(0.5f, 0.495f), cmde::VEC2F(0.5f, 0.51f), 0x00FF);
 
 		camera.position = camera.position + camera.forwards * (inputs[L'w'] >= 2 ? 0.05f : 0);
 		camera.position = camera.position + camera.left * (inputs[L'a'] >= 2 ? 0.05f : 0);
@@ -2366,6 +2451,10 @@ public:
 		if (inputs[L'r'] == 2)
 		{
 			myRenderingSystem = !myRenderingSystem;
+		}
+		if (inputs[L'f'] == 2)
+		{
+			obj2.mesh.ChangeColor((obj2.mesh.triangles[0].color + 1) % 16);
 		}
 
 		camera.facing.x += (inputs[MOUSE_X] > 200 ? -0.4f : 0); // right
