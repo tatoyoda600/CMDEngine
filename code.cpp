@@ -134,6 +134,150 @@ namespace cmde
 		}
 	};
 
+	class CMDEngine;
+
+	struct File
+	{
+		OPENFILENAMEW fileName;
+		HANDLE fileHandle;
+		static const unsigned long CHUNK_SIZE = 1024;
+
+		File()
+		{
+			fileName = { 0 };
+			fileHandle = { 0 };
+		}
+
+		template <class T>
+		bool ProcessFile(T(*func)(wchar_t*, unsigned long, T), T* output)
+		{
+			LARGE_INTEGER fileSize = { 0 };
+			if (GetFileSizeEx(fileHandle, &fileSize) == false)
+				return false;
+
+			byte buffer[CHUNK_SIZE] = { 0 };
+			wchar_t wbuffer[CHUNK_SIZE] = { 0 };
+			wchar_t lineBuffer[CHUNK_SIZE] = { 0 };
+			unsigned long lineBufferPos = 0; //The position in lineBuffer where the last line stopped
+			DWORD readCount = 0;
+			OVERLAPPED filePosition{};
+
+			long tempHigh = fileSize.HighPart;
+			unsigned long tempLow = fileSize.LowPart;
+			unsigned long counter = 0;
+			while (tempHigh > 0 || tempLow > CHUNK_SIZE)
+			{
+				if (counter < (ULONG_MAX - CHUNK_SIZE) + 1 ||  //counter + CHUNK_SIZE can fit within a ulong
+					tempHigh > 1 || //There's at least 2 * ULONG_MAX bytes (Meaning even if counter overflows into 1 high part, there's still enough extra)
+					tempLow > CHUNK_SIZE || //There are enough bytes in the low part to cover an entire chunk (For when the high parts run out and start counting down on the low part)
+					(tempHigh == 1 && CHUNK_SIZE > ((ULONG_MAX - counter) + 1) && tempLow > CHUNK_SIZE - ((ULONG_MAX - counter) + 1)) //The amount of bytes in the low part are enough to hold the overflow
+					)
+				{
+					//There are CHUNK_SIZE bytes remaining
+
+					//Reads CHUNK_SIZE at a time
+					filePosition.OffsetHigh = fileSize.HighPart - tempHigh;
+					filePosition.Offset = counter;
+					if (ReadFile(fileHandle, &buffer, CHUNK_SIZE, &readCount, NULL) == true)
+					{
+						for (int i = 0; i < readCount; i++)
+						{
+							//For every byte that was read, convert it into a wchar and store it
+							wbuffer[i] = (wchar_t)buffer[i];
+							//Add character to the end of what is currently stored in lineBuffer
+							lineBuffer[lineBufferPos] = wbuffer[i];
+							lineBufferPos++;
+							if (wbuffer[i] == L'\n')
+							{
+								//If reached a newline character, lineBuffer now has a full line, and store where that line ends in the wbuffer
+								output = &func(lineBuffer, lineBufferPos, *output);
+								lineBufferPos = 0;
+							}
+							if (lineBufferPos >= CHUNK_SIZE)
+							{
+								//If the line that is being read is longer than the current CHUNK_SIZE can allow
+								output = new T();
+								return false;
+							}
+						}
+					}
+					else
+					{
+						output = new T();
+						return false;
+					}
+
+					if (counter < (ULONG_MAX - CHUNK_SIZE) + 1)
+					{
+						//If CHUNK_SIZE can be added to counter without overflow
+						counter += CHUNK_SIZE;
+						if (tempHigh == 0)
+						{
+							//If there're no more high parts
+							tempLow -= CHUNK_SIZE; //Count down on tempLow the amount of bytes left
+						}
+					}
+					else
+					{
+						//If CHUNK_SIZE would make counter overflow
+						tempHigh--;
+						counter = CHUNK_SIZE - ((ULONG_MAX - counter) + 1); //Subtracting the leftover bytes remaining in the high part from the ones to be added
+						if (tempHigh == 0)
+						{
+							//If there're no more high parts to take care of the overflow
+							tempLow -= counter; //Start countdown of bytes left on tempLow by removing the one's taken from the last high part by counter
+						}
+					}
+				}
+				else
+				{
+					//CHUNK_SIZE would go over the file's size
+					if (tempHigh > 0)
+					{
+						//If there're still bytes remaining in a high part
+						tempLow += (ULONG_MAX - counter) + 1; //Adding the leftover bytes remaining in the high part
+					}
+					break;
+				}
+			}
+			//tempLow bytes remain unread in the file (Less than CHUNK_SIZE)
+			filePosition.OffsetHigh = fileSize.HighPart - tempHigh;
+			filePosition.Offset = counter;
+			if (ReadFile(fileHandle, &buffer, tempLow, &readCount, NULL) == true)
+			{
+				for (int i = 0; i < readCount; i++)
+				{
+					//For every byte that was read, convert it into a wchar and store it
+					wbuffer[i] = (wchar_t)buffer[i];
+					//Add character to the end of what is currently stored in lineBuffer
+					lineBuffer[lineBufferPos] = wbuffer[i];
+					lineBufferPos++;
+					if (wbuffer[i] == L'\n')
+					{
+						//If reached a newline character, lineBuffer now has a full line, and store where that line ends in the wbuffer
+						output = &func(lineBuffer, lineBufferPos, *output);
+						lineBufferPos = 0;
+					}
+				}
+			}
+			else
+			{
+				output = new T();
+				return false;
+			}
+			if (lineBufferPos != 0)
+			{
+				//If the document doesn't end with a new line character, stick one on the end and pass the line to the function
+				lineBuffer[lineBufferPos] = L'\n';
+				lineBufferPos++;
+				output = &func(lineBuffer, lineBufferPos, *output);
+				lineBufferPos = 0;
+			}
+			CloseHandle(fileHandle);
+			return false;
+		}
+	};
+
 
 	class CMDEngine
 	{
@@ -879,11 +1023,50 @@ namespace cmde
 					WriteConsoleOutput(console, screen, { screenSize.X, screenSize.Y }, { 0, 0 }, &sr);
 				}
 			}
+			CloseHandle(window);
+			CloseHandle(console);
+			CloseHandle(consoleInput);
 		}
 
 		virtual void Setup() = 0;
 
 		virtual void Update() = 0;
+
+						/// <summary>
+						/// Opens a Windows Explorer window, allowing the user to choose a file of the designated file type to open. Will return true if a file is chosen.
+						/// </summary>
+						/// <param name="openFile">The variable to which this function will write the output file to if the user picks a file</param>
+						/// <param name="fileType">The file type the user will be asked for</param>
+						/// <param name="fileExtensions">The internal file type info. Must be formatted correctly: L"*.txt;*.jpg;*.png"</param>
+		bool PromptFileSearch(File *openFile, const wchar_t* fileType, const wchar_t* fileExtensions)
+		{
+			openFile->fileName.lStructSize = sizeof(OPENFILENAMEW);
+			openFile->fileName.hwndOwner = window;
+			wchar_t temp[128] = {0};
+			swprintf(temp, 128, L"%ls (%ls)%c%ls%c%c", fileType, fileExtensions, '\0', fileExtensions, '\0', '\0');
+			openFile->fileName.lpstrFilter = temp;
+			wchar_t flnm[MAX_PATH] = {0};
+			flnm[0] = L'\0';
+			openFile->fileName.lpstrFile = flnm;
+			openFile->fileName.nMaxFile = MAX_PATH;
+			openFile->fileName.Flags = OFN_FILEMUSTEXIST;
+			wchar_t temp2[128];
+			swprintf(temp2, 128, L"Open %ls file to import...", fileType);
+			openFile->fileName.lpstrTitle = temp2;
+			if (GetOpenFileNameW(&(openFile->fileName)))
+			{
+				HANDLE fileHandle = CreateFileW(openFile->fileName.lpstrFile, GENERIC_READ,
+					0, (LPSECURITY_ATTRIBUTES)NULL,
+					OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
+					(HANDLE)NULL);
+				if (fileHandle != INVALID_HANDLE_VALUE)
+				{
+					openFile->fileHandle = fileHandle;
+					return true;
+				}
+			}
+			return false;
+		}
 
 
 		//General useful functions
@@ -1919,6 +2102,7 @@ class Test3D : public cmde::CMDEngine
 			sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
 		}
 
+		//TODO, MAYBE
 		void PostProcessing(std::vector<COORD>* buffer)
 		{
 			for (COORD& b : *buffer)
@@ -2094,6 +2278,15 @@ class Test3D : public cmde::CMDEngine
 		return output;
 	}
 
+	static Mesh OBJToMesh(wchar_t* line, unsigned long characterCount, Mesh m)
+	{
+		//Read line[0-characterCount]
+		//Extract information
+		//Create a new Mesh using m.triangles and whatever information was extracted
+		Mesh output = Mesh(m.triangles);
+		return output;
+	}
+
 public:
 	Object obj1;
 	Object obj2;
@@ -2103,11 +2296,11 @@ public:
 	Camera camera;
 	bool myRenderingSystem;
 	bool wireframe;
-	std::vector<COORD> postProcessBuffer = {};
+	std::vector<COORD> postProcessBuffer = {}; //TODO, MAYBE
 	std::vector<Object> objects = {};
 
 
-	Test3D(short screenWidth, short screenHeight, short fontWidth, short fontHeight) : cmde::CMDEngine(screenWidth, screenHeight, fontWidth, fontHeight, true, true, FPS60)
+	Test3D(short screenWidth, short screenHeight, short fontWidth, short fontHeight) : cmde::CMDEngine(screenWidth, screenHeight, fontWidth, fontHeight, true, false, FPS60) //DEBUG (SET FALSE TO TRUE)
 	{
 		//1x1x1 Cube
 		///*
@@ -2408,8 +2601,8 @@ public:
 		camera.UpdateInBounds();
 
 		//Raycast crosshair
-		PLANE tempPlanes = Raycast(camera.position, camera.forwards, &objects);
 		objects.at(2).mesh = Mesh(std::vector<Triangle> { { { 0.1f, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0.1f, 0 }, 0x0003 }, { { 0, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0, 0 }, 0x0003 }});
+		PLANE tempPlanes = Raycast(camera.position, camera.forwards, &objects);
 		std::vector<Triangle> tempTriangles = std::vector<Triangle>();
 		cmde::VEC3F tempV1 = Normalize(CrossProduct(tempPlanes.normal, tempPlanes.normal + camera.up));
 		cmde::VEC3F tempV2 = Normalize(CrossProduct(tempPlanes.normal, tempV1));
@@ -2454,7 +2647,12 @@ public:
 		}
 		if (inputs[L'f'] == 2)
 		{
-			obj2.mesh.ChangeColor((obj2.mesh.triangles[0].color + 1) % 16);
+			cmde::File file;
+			if (PromptFileSearch(&file, L"OBJ", L"*.obj"))
+			{
+				Mesh output = Mesh();
+				file.ProcessFile<Mesh>(&OBJToMesh, &output);
+			}
 		}
 
 		camera.facing.x += (inputs[MOUSE_X] > 200 ? -0.4f : 0); // right

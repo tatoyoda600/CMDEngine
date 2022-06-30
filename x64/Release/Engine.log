@@ -1,7 +1,11 @@
 ﻿  code.cpp
-  Generating code
-  2 of 473 functions ( 0.4%) were compiled, the rest were copied from previous compilation.
-    1 functions were new in current compilation
-    8 functions had inline decision re-evaluated but remain unchanged
-  Finished generating code
-  Engine.vcxproj -> C:\Users\tatoy\source\repos\Engine\x64\Release\Engine.exe
+C:\Users\tatoy\source\repos\Engine\code.cpp(1081,3): error C3878: syntax error: unexpected token 'long' following 'expression'
+C:\Users\tatoy\source\repos\Engine\code.cpp(152,8): message : This diagnostic occurred in the compiler generated function 'bool cmde::File::ReadFileChunk(cmde::CMDEngine *,T (__cdecl *)(wchar_t *,unsigned long,T),T *)'
+C:\Users\tatoy\source\repos\Engine\code.cpp(1081,3): message : error recovery skipped: 'long identifier =  . . . identifier'
+C:\Users\tatoy\source\repos\Engine\code.cpp(152,8): message : This diagnostic occurred in the compiler generated function 'bool cmde::File::ReadFileChunk(cmde::CMDEngine *,T (__cdecl *)(wchar_t *,unsigned long,T),T *)'
+C:\Users\tatoy\source\repos\Engine\code.cpp(1092,5): error C3878: syntax error: unexpected token 'identifier' following 'expression'
+C:\Users\tatoy\source\repos\Engine\code.cpp(152,8): message : This diagnostic occurred in the compiler generated function 'bool cmde::File::ReadFileChunk(cmde::CMDEngine *,T (__cdecl *)(wchar_t *,unsigned long,T),T *)'
+C:\Users\tatoy\source\repos\Engine\code.cpp(1092,5): message : error recovery skipped: 'identifier . identifier  . . . identifier'
+C:\Users\tatoy\source\repos\Engine\code.cpp(152,8): message : This diagnostic occurred in the compiler generated function 'bool cmde::File::ReadFileChunk(cmde::CMDEngine *,T (__cdecl *)(wchar_t *,unsigned long,T),T *)'
+C:\Users\tatoy\source\repos\Engine\code.cpp(1093,49): message : parsing resumes here
+C:\Users\tatoy\source\repos\Engine\code.cpp(152,8): message : This diagnostic occurred in the compiler generated function 'bool cmde::File::ReadFileChunk(cmde::CMDEngine *,T (__cdecl *)(wchar_t *,unsigned long,T),T *)'
