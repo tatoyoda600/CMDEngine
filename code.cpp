@@ -142,7 +142,7 @@ namespace cmde
 		///<summary></summary>
 		OPENFILENAMEW fileName;
 		HANDLE fileHandle;
-		static const unsigned long CHUNK_SIZE = 1024;
+		static const unsigned long CHUNK_SIZE = 4096; //4kb
 
 		FILE()
 		{
@@ -162,7 +162,6 @@ namespace cmde
 				return false;
 
 			byte buffer[CHUNK_SIZE] = { 0 };
-			wchar_t wbuffer[CHUNK_SIZE] = { 0 };
 			wchar_t lineBuffer[CHUNK_SIZE] = { 0 };
 			unsigned long lineBufferPos = 0; //The position in lineBuffer where the last line stopped
 			DWORD readCount = 0;
@@ -188,12 +187,10 @@ namespace cmde
 					{
 						for (DWORD i = 0; i < readCount; i++)
 						{
-							//For every byte that was read, convert it into a wchar and store it
-							wbuffer[i] = (wchar_t)buffer[i];
-							//Add character to the end of what is currently stored in lineBuffer
-							lineBuffer[lineBufferPos] = wbuffer[i];
+							//For every byte that was read, convert it into a wchar and store it at the end of what is currently stored in lineBuffer
+							lineBuffer[lineBufferPos] = (wchar_t)buffer[i];
 							lineBufferPos++;
-							if (wbuffer[i] == L'\n')
+							if (lineBuffer[lineBufferPos - 1] == L'\n')
 							{
 								//If reached a newline character, lineBuffer now has a full line, and store where that line ends in the wbuffer
 								output->ProcessLine(lineBuffer, lineBufferPos);
@@ -253,12 +250,10 @@ namespace cmde
 			{
 				for (DWORD i = 0; i < readCount; i++)
 				{
-					//For every byte that was read, convert it into a wchar and store it
-					wbuffer[i] = (wchar_t)buffer[i];
-					//Add character to the end of what is currently stored in lineBuffer
-					lineBuffer[lineBufferPos] = wbuffer[i];
+					//For every byte that was read, convert it into a wchar and store it at the end of what is currently stored in lineBuffer
+					lineBuffer[lineBufferPos] = (wchar_t)buffer[i];
 					lineBufferPos++;
-					if (wbuffer[i] == L'\n')
+					if (lineBuffer[lineBufferPos - 1] == L'\n')
 					{
 						//If reached a newline character, lineBuffer now has a full line, and store where that line ends in the wbuffer
 						output->ProcessLine(lineBuffer, lineBufferPos);
@@ -561,13 +556,15 @@ namespace cmde
 			Draw(x2, y2, col, cha, depth2);
 			tx = fmod(ux - fmod(x1, 1.0f), 1.0f);
 			ty = fmod(uy - fmod(y1, 1.0f), 1.0f);
+			LINEAR depthFunc = LinearFunction(x1, depth1, x2, depth2);
 			for (float x = x1 + tx, y = y1 + uy * abs(tx * sy); x * ux < x2 * ux; x += ux, y += sy)
 			{
-				Draw(x, y, col, cha, LinearFunction(x1, depth1, x2, depth2, x));
+				Draw(x, y, col, cha, depthFunc.f(x).y);
 			}
+			depthFunc = LinearFunction(y1, depth1, y2, depth2);
 			for (float y = y1 + ty, x = x1 + ux * abs(ty * sx); y * uy < y2 * uy; y += uy, x += sx)
 			{
-				Draw(x, y, col, cha, LinearFunction(y1, depth1, y2, depth2, y));
+				Draw(x, y, col, cha, depthFunc.f(y).y);
 			}
 		}
 							/// <summary>Draws a line on the command pront from a point to another point</summary> /// <param name="p1">The position of the first point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="p2">The position of the second point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param> /// <param name="depth1">How far away from the camera the first point is (For rendering things on top of each other) (Negative values are always drawn)</param> /// <param name="depth2">How far away from the camera the second point is (For rendering things on top of each other) (Negative values are always drawn)</param>
@@ -1082,35 +1079,25 @@ namespace cmde
 
 		//General useful functions
 	#pragma region MiscFunctions
-		static float Pow2(float f)
-		{
-			return f * f;
-		}
-		static float DotProduct(VEC4F v1, VEC4F v2)
-		{
-			return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;
-		}
-		static VEC3F CrossProduct(VEC3F v1, VEC3F v2)
-		{
-			return { v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x };
-		}
-		static float Magnitude(VEC4F v)
-		{
-			return sqrt(abs(DotProduct(v, v)));
-		}
-		static float Clamp(float v, float lo, float hi)
-		{
-			return v < lo ? lo : hi < v ? hi : v;
-		}
+						/// <summary>Elevates a number to the power of 2</summary>
+		static double Pow2(double value) { return value * value; }
+						/// <summary>Calculates the dot product of 2 vectors</summary>
+		static float DotProduct(VEC4F v1, VEC4F v2) { return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w; }
+						/// <summary>Calculates the orthagonal vector of a plane defined by 2 vectors (Index = v1; Middle = v2; Thumb = result)</summary>
+		static VEC3F CrossProduct(VEC3F v1, VEC3F v2) { return { v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x }; }
+						/// <summary>Calculates the length of a vector</summary>
+		static float Magnitude(VEC4F v) { return sqrt(abs(DotProduct(v, v))); }
+						/// <summary>Limits 'value' to the range between 'low' and 'high'</summary>
+		static float Clamp(float value, float low, float high) { return (value < low ? low : (high < value ? high : value)); }
+						/// <summary>Gives the sign of a value (Positive = 1; Negative = -1; Other = itself)</summary>
+		static int Sign(int value) { return (value > 0 ? 1 : (value < 0 ? -1 : value)); }
+						/// <summary>Gives the sign of a value (Positive = 1; Negative = -1; Other = itself)</summary>
+		static double Sign(double value) { return (value > 0.0 ? 1.0 : (value < 0.0 ? -1.0 : value)); }
 						/// <summary>Calculates the angle between 2 vectors in degrees</summary>
-		static float Angle(VEC4F v1, VEC4F v2)
-		{
-			return acos(Clamp(DotProduct(v1, v2) / (Magnitude(v2) * Magnitude(v1)), -1.0f, 1.0f)) * DEG;
-		}
-		static VEC4F Normalize(VEC4F v)
-		{
-			return v / Magnitude(v);
-		}
+		static float Angle(VEC4F v1, VEC4F v2) { return acos(Clamp(DotProduct(v1, v2) / (Magnitude(v2) * Magnitude(v1)), -1.0f, 1.0f)) * DEG; }
+						/// <summary>Gives a vector of length 1 in the same direction</summary>
+		static VEC4F Normalize(VEC4F v) { return v / Magnitude(v); }
+
 	#pragma region LinearFunction
 						/// <summary>Calculates the y value of point x on the line defined by the 2 points provided (Returns y1 if x1 == x2)</summary>
 		static float LinearFunction(float x1, float y1, float x2, float y2, float x)
@@ -2034,12 +2021,18 @@ class Test3D : public cmde::CMDEngine
 						{
 							ptr++;
 						}
-						index = std::wcstod(ptr, &ptr) - 1;
+						index = (int)(std::wcstod(ptr, &ptr) - 1.0);
 						tempVs.push_back(points[index]);
-						ptr++;
-						trash = std::wcstod(ptr, &ptr); //[vn]
-						ptr++;
-						trash = std::wcstod(ptr, &ptr); //[vt]
+						if (*ptr == L'/')
+						{
+							ptr++;
+							trash = std::wcstod(ptr, &ptr); //[vn]
+						}
+						if (*ptr == L'/')
+						{
+							ptr++;
+							trash = std::wcstod(ptr, &ptr); //[vt]
+						}
 					}
 					for (int i = 0; i < tempVs.size() - 1; i++)
 					{
@@ -2150,7 +2143,7 @@ class Test3D : public cmde::CMDEngine
 			std::vector<Triangle> newTriangles = ClipTriangles(obj, position, inBounds);
 			for (Triangle t : newTriangles)
 			{
-				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - position) > 0)
+				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - position) >= 0)
 				{
 					//Backface culling (This isn't a TODO, skipping the triangle like this is the backface culling)
 					continue;
