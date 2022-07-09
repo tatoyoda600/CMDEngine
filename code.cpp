@@ -4,7 +4,6 @@
 //https://github.com/OneLoneCoder/CommandLineFPS/blob/master/CommandLineFPS.cpp
 
 #include <Windows.h> //https://docs.microsoft.com/en-us/previous-versions//aa383686(v=vs.85)
-#include <iostream>
 #include <chrono>
 #include <map>
 
@@ -57,10 +56,6 @@
 
 
 
-//There are some weird issues with the 1st summary, but declaring an empty one causes the rest to work fine
-///<summary>
-///</summary>
-
 
 namespace cmde
 {
@@ -81,6 +76,8 @@ namespace cmde
 		}
 
 		VEC4F operator* (const float& a) { return VEC4F(x * a, y * a, z * a, w * a); }
+		VEC4F operator* (const double& a) { return *this * (float)a; }
+		VEC4F operator* (const int& a) { return *this * (float)a; }
 		VEC4F operator/ (const float& a) { return VEC4F(x / a, y / a, z / a, w / a); }
 		VEC4F operator* (const VEC4F& a) { return VEC4F(x * a.x, y * a.y, z * a.z, w * a.w); }
 		VEC4F operator+ (const VEC4F& a) { return VEC4F(x + a.x, y + a.y, z + a.z, w + a.w); }
@@ -166,22 +163,18 @@ namespace cmde
 
 	struct FILE
 	{
-		//There are some weird issues with the 1st summary, but declaring an empty one causes the rest to work fine
-		///<summary></summary>
-		OPENFILENAMEW fileName;
-		HANDLE fileHandle;
+		OPENFILENAMEW fileName = { 0 };
+		HANDLE fileHandle = { 0 };
 		static const unsigned long CHUNK_SIZE = 4096; //4kb
+		wchar_t name[128] = { 0 };
+		wchar_t extension[128] = { 0 };
 
-		FILE()
-		{
-			fileName = { 0 };
-			fileHandle = { 0 };
-		}
+		FILE(){}
 
 						/// <summary>
 						/// Reads this file, splits it into lines, and then passes it to the output's processing function. (T's class should be a child of PROCESSEDFILE)
 						/// </summary>
-						/// <param name="output">Some type of PROCESSEDFILE where the data read will be stored afterwards</param>
+						/// <param name="output">Some type of PROCESSEDFILE where the data read will be stored afterwards. To define UTF encoding override 'static const bool utf16' from PROCESSEDFILE (true -> UTF-16; false -> UTF-8)</param>
 		template <class T>
 		bool ProcessFile(T* output)
 		{
@@ -213,22 +206,53 @@ namespace cmde
 					filePosition.Offset = counter;
 					if (ReadFile(fileHandle, &buffer, CHUNK_SIZE, &readCount, NULL))
 					{
-						for (DWORD i = 0; i < readCount; i++)
+						if (!output->utf16)
 						{
-							//For every byte that was read, convert it into a wchar and store it at the end of what is currently stored in lineBuffer
-							lineBuffer[lineBufferPos] = (wchar_t)buffer[i];
-							lineBufferPos++;
-							if (lineBuffer[lineBufferPos - 1] == L'\n')
+							//UTF-8
+							for (DWORD i = 0; i < readCount; i++)
 							{
-								//If reached a newline character, lineBuffer now has a full line, and store where that line ends in the wbuffer
-								output->ProcessLine(lineBuffer, lineBufferPos);
-								lineBufferPos = 0;
+								//For every byte that was read, convert it into a wchar and store it at the end of what is currently stored in lineBuffer
+								lineBuffer[lineBufferPos] = (wchar_t)buffer[i];
+								lineBufferPos++;
+								if (lineBuffer[lineBufferPos - 1] == L'\n')
+								{
+									//If reached a newline character, lineBuffer now has a full line, and store where that line ends in the wbuffer
+									output->ProcessLine(lineBuffer, lineBufferPos);
+									lineBufferPos = 0;
+								}
+								if (lineBufferPos >= CHUNK_SIZE)
+								{
+									//If the line that is being read is longer than the current CHUNK_SIZE can allow
+									output = new T();
+									return false;
+								}
 							}
-							if (lineBufferPos >= CHUNK_SIZE)
+						}
+						else
+						{
+							//UTF-16
+							char wcharBytes[3] = { 0 };
+							wchar_t wchar[2] = { 0 };
+							for (DWORD i = 0; i < readCount; i += 2)
 							{
-								//If the line that is being read is longer than the current CHUNK_SIZE can allow
-								output = new T();
-								return false;
+								//For every byte that was read, convert it into a wchar and store it at the end of what is currently stored in lineBuffer
+								wcharBytes[0] = buffer[i];
+								wcharBytes[1] = buffer[i + 1];
+								MultiByteToWideChar(CP_UTF8, 0, wcharBytes, 3, wchar, 2);
+								lineBuffer[lineBufferPos] = wchar[0];
+								lineBufferPos++;
+								if (lineBuffer[lineBufferPos - 1] == L'\n')
+								{
+									//If reached a newline character, lineBuffer now has a full line, and store where that line ends in the wbuffer
+									output->ProcessLine(lineBuffer, lineBufferPos);
+									lineBufferPos = 0;
+								}
+								if (lineBufferPos >= CHUNK_SIZE)
+								{
+									//If the line that is being read is longer than the current CHUNK_SIZE can allow
+									output = new T();
+									return false;
+								}
 							}
 						}
 					}
@@ -276,16 +300,41 @@ namespace cmde
 			filePosition.Offset = counter;
 			if (ReadFile(fileHandle, &buffer, tempLow, &readCount, NULL))
 			{
-				for (DWORD i = 0; i < readCount; i++)
+				if (!output->utf16)
 				{
-					//For every byte that was read, convert it into a wchar and store it at the end of what is currently stored in lineBuffer
-					lineBuffer[lineBufferPos] = (wchar_t)buffer[i];
-					lineBufferPos++;
-					if (lineBuffer[lineBufferPos - 1] == L'\n')
+					//UTF-8
+					for (DWORD i = 0; i < readCount; i++)
 					{
-						//If reached a newline character, lineBuffer now has a full line, and store where that line ends in the wbuffer
-						output->ProcessLine(lineBuffer, lineBufferPos);
-						lineBufferPos = 0;
+						//For every byte that was read, convert it into a wchar and store it at the end of what is currently stored in lineBuffer
+						lineBuffer[lineBufferPos] = (wchar_t)buffer[i];
+						lineBufferPos++;
+						if (lineBuffer[lineBufferPos - 1] == L'\n')
+						{
+							//If reached a newline character, lineBuffer now has a full line, and store where that line ends in the wbuffer
+							output->ProcessLine(lineBuffer, lineBufferPos);
+							lineBufferPos = 0;
+						}
+					}
+				}
+				else
+				{
+					//UTF-16
+					char wcharBytes[3] = { 0 };
+					wchar_t wchar[2] = { 0 };
+					for (DWORD i = 0; i < readCount; i += 2)
+					{
+						//For every byte that was read, convert it into a wchar and store it at the end of what is currently stored in lineBuffer
+						wcharBytes[0] = buffer[i];
+						wcharBytes[1] = buffer[i + 1];
+						MultiByteToWideChar(CP_UTF8, 0, wcharBytes, 3, wchar, 2);
+						lineBuffer[lineBufferPos] = wchar[0];
+						lineBufferPos++;
+						if (lineBuffer[lineBufferPos - 1] == L'\n')
+						{
+							//If reached a newline character, lineBuffer now has a full line, and store where that line ends in the wbuffer
+							output->ProcessLine(lineBuffer, lineBufferPos);
+							lineBufferPos = 0;
+						}
 					}
 				}
 			}
@@ -305,10 +354,50 @@ namespace cmde
 			CloseHandle(fileHandle);
 			return false;
 		}
+
+						/// <summary>
+						/// Compares this file's extension to the one passed to this function
+						/// </summary>
+						/// <param name="extension">The extension to compare against, without the starting '.' (Ex. 'HasExtension(L"png")')</param>
+		bool HasExtension(const wchar_t* extension)
+		{
+			return wcscmp(this->extension, extension) == 0;
+		}
 	};
 	struct PROCESSEDFILE
 	{
+		static const bool utf16 = false;
 		virtual void ProcessLine(wchar_t*, unsigned long) = 0;
+						/// <summary>Check PROCESSEDFILE struct in cmde for an example, with both UTF-8 and UTF-16 encoding verions</summary>
+		template <class T>
+		static bool Export(cmde::FILE exportFile, T exportData) { return false; }
+		/*
+		//Example
+		static bool Export(cmde::FILE& exportFile, Type name)
+		{
+			wchar_t lineBuffer[cmde::FILE::CHUNK_SIZE] = { 0 };
+			//UTF-8 Version
+			//
+			DWORD writeCount = swprintf(lineBuffer, cmde::FILE::CHUNK_SIZE, L"(%f)\n", name.value);
+			char byteBuffer[cmde::FILE::CHUNK_SIZE] = { 0 };
+			writeCount = WideCharToMultiByte(CP_UTF8, 0, lineBuffer, -1, byteBuffer, cmde::FILE::CHUNK_SIZE, NULL, NULL);
+			if (!WriteFile(exportFile.fileHandle, &byteBuffer, writeCount - 1, &writeCount, NULL))
+			{
+				return false;
+			}
+			//
+
+			//UTF-16 Version
+			//
+			DWORD writeCount = swprintf(lineBuffer, cmde::FILE::CHUNK_SIZE, L"(%f)\n", name.value);
+			if (!WriteFile(exportFile.fileHandle, &lineBuffer, writeCount * 2, &writeCount, NULL))
+			{
+				return false;
+			}
+			return true;
+			//
+		}
+		*/
 	};
 
 
@@ -335,7 +424,7 @@ namespace cmde
 		wchar_t title[256];
 		float fpsLimit;
 		float* zBuffer;
-		/// <summary>0 -> nothing ; 1 -> released ; 2 -> pressed ; 3 -> held ; MOUSE_X and MOUSE_Y -> point on the command prompt</summary>
+						/// <summary>0 -> nothing ; 1 -> released ; 2 -> pressed ; 3 -> held ; MOUSE_X and MOUSE_Y -> point on the command prompt</summary>
 		std::map<wchar_t, short> inputs;
 
 						/// <summary>
@@ -394,8 +483,8 @@ namespace cmde
 			}
 
 			//Setting up the console window (Not entirely sure about what everything here does, had to copy most of it due to the complexity)
-	#pragma region ConsoleWindowSetup
-			//Creates an object that then basically functions as the console
+#pragma region ConsoleWindowSetup
+		//Creates an object that then basically functions as the console
 			console = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 			//Gets a reference to the input handler
 			consoleInput = GetStdHandle(STD_INPUT_HANDLE);
@@ -496,11 +585,11 @@ namespace cmde
 				ThrowError(L"SetConsoleWindowInfo");
 				return;
 			}
-	#pragma endregion
-			
+#pragma endregion
+
 			//Gets a reference to the program window and changes some settings
-	#pragma region WindowSettings
-			//Sets the title of the program to something random in order to distinguish it from the other programs on the computer
+#pragma region WindowSettings
+		//Sets the title of the program to something random in order to distinguish it from the other programs on the computer
 			int temp = rand();
 			swprintf(_msg, 128, L"%d", temp);
 			SetConsoleTitle(_msg);
@@ -510,7 +599,7 @@ namespace cmde
 			//Changes the window's settings (Prevents maximizing, minimizing, and resizing)
 			SetWindowLongPtrW(window, GWL_STYLE, WS_OVERLAPPEDWINDOW & ~(WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SIZEBOX));
 			::SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_SHOWWINDOW | SWP_NOSIZE | SWP_NOREPOSITION);
-	#pragma endregion
+#pragma endregion
 		}
 
 						/// <summary>
@@ -526,12 +615,12 @@ namespace cmde
 			return 0;
 		}
 
-		bool OnScreen(short x, short y) { return (x >= 0 && y >= 0 && x < screenSize.X && y < screenSize.Y); }
-			bool OnScreen(VEC2F p) { return (p.x >= 0 && p.y >= 0 && p.x < screenSize.X && p.y < screenSize.Y); }
+		bool OnScreen(short x, short y) { return (x >= 0 && y >= 0 && x < screenSize.X&& y < screenSize.Y); }
+		bool OnScreen(VEC2F p) { return (p.x >= 0 && p.y >= 0 && p.x < screenSize.X&& p.y < screenSize.Y); }
 
-	#pragma region DrawFunctions
+#pragma region DrawFunctions
 		//Simply modifies the value of the specified position in the screen array
-		#pragma region Draw
+#pragma region Draw
 						/// <summary>
 						/// Draws to a specific point on the command prompt
 						/// </summary>
@@ -540,21 +629,21 @@ namespace cmde
 						/// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param>
 						/// <param name="cha">The character with which to draw to that point</param>
 						/// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
-			void Draw(short x, short y, short col = 0x000F, short cha = 0x2588, float depth = -1)
+		void Draw(short x, short y, short col = 0x000F, short cha = 0x2588, float depth = -1)
+		{
+			if (OnScreen(x, y) && (depth < 0 || (depth >= 0 && depth < zBuffer[y * screenSize.X + x])))
 			{
-				if (OnScreen(x, y) && (depth < 0 || (depth >= 0 && depth < zBuffer[y * screenSize.X + x])))
-				{
-					screen[y * screenSize.X + x].Char.UnicodeChar = cha;
-					screen[y * screenSize.X + x].Attributes = col;
-					zBuffer[y * screenSize.X + x] = depth;
-				}
+				screen[y * screenSize.X + x].Char.UnicodeChar = cha;
+				screen[y * screenSize.X + x].Attributes = col;
+				zBuffer[y * screenSize.X + x] = depth;
 			}
-			//Due to issues with numbers between 0-1 when casting, '(short)((short)(x + 2) - 2)' is needed, since numbers between 2-3 convert correctly
-							/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="x">The x position of the point (Leftmost is 0; Rightmost is screenSize.X)</param> /// <param name="y">The y position of the point (Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
-			void Draw(float x, float y, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)((short)(x + 2) - 2), (short)((short)(y + 2) - 2), col, cha, depth); }
-							/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="p">The position of the point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
-			void Draw(VEC2F p, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)((short)(p.x + 2) - 2), (short)((short)(p.y + 2) - 2), col, cha, depth); }
-		#pragma endregion
+		}
+		//Due to issues with numbers between 0-1 when casting, '(short)((short)(x + 2) - 2)' is needed, since numbers between 2-3 convert correctly
+						/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="x">The x position of the point (Leftmost is 0; Rightmost is screenSize.X)</param> /// <param name="y">The y position of the point (Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void Draw(float x, float y, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)((short)(x + 2) - 2), (short)((short)(y + 2) - 2), col, cha, depth); }
+						/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="p">The position of the point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void Draw(VEC2F p, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)((short)(p.x + 2) - 2), (short)((short)(p.y + 2) - 2), col, cha, depth); }
+#pragma endregion
 
 		//Gets the step size for the reaction in 1 axis when moving 1 unit in the other
 		//	by going from point 1 to point 2 like this in both axis, you can find every space through which the line crosses
@@ -562,7 +651,7 @@ namespace cmde
 		//	after the first movement in each axis, the movements can be by 1 unit
 		//If the points are whole numbers, the first step can be skipped due to knowing that the points will always be exactly in a space
 		//Using relative screen space for the points is the same as normal, but with the added step of converting the coordinates first
-		#pragma region DrawLine
+#pragma region DrawLine
 						/// <summary>
 						/// Draws a line on the command prompt from a point to another point
 						/// </summary>
@@ -581,8 +670,8 @@ namespace cmde
 			float sx = (ty != 0 ? ux * abs(tx / ty) : 0), sy = (tx != 0 ? uy * abs(ty / tx) : 0);
 			Draw(x1, y1, col, cha, depth1);
 			Draw(x2, y2, col, cha, depth2);
-			tx = fmod(ux - fmod(x1, 1.0f), 1.0f);
-			ty = fmod(uy - fmod(y1, 1.0f), 1.0f);
+			tx = (float)fmod(ux - fmod(x1, 1.0f), 1.0f);
+			ty = (float)fmod(uy - fmod(y1, 1.0f), 1.0f);
 			LINEAR depthFunc = LinearFunction(x1, depth1, x2, depth2);
 			for (float x = x1 + tx, y = y1 + uy * abs(tx * sy); x * ux < x2 * ux; x += ux, y += sy)
 			{
@@ -594,18 +683,18 @@ namespace cmde
 				Draw(x, y, col, cha, depthFunc.f(y).y);
 			}
 		}
-							/// <summary>Draws a line on the command pront from a point to another point</summary> /// <param name="p1">The position of the first point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="p2">The position of the second point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param> /// <param name="depth1">How far away from the camera the first point is (For rendering things on top of each other) (Negative values are always drawn)</param> /// <param name="depth2">How far away from the camera the second point is (For rendering things on top of each other) (Negative values are always drawn)</param>
-			void DrawLine(VEC2F p1, VEC2F p2, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1) { DrawLine(p1.x, p1.y, p2.x, p2.y, col, cha, depth1, depth2); }
-							/// <summary>Draws a line on the command pront from a point in relative screen space to another point in relative screen space</summary> /// <param name="x1">The x position of the first point in relative screen space (Leftmost is 0.0; Rightmost is 1.0)</param> /// <param name="y1">The y position of the first point in relative screen space (Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="x2">The x position of the second point in relative screen space (Leftmost is 0.0; Rightmost is 1.0)</param> /// <param name="y2">The y position of the second point in relative screen space (Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param> /// <param name="depth1">How far away from the camera the first point is (For rendering things on top of each other) (Negative values are always drawn)</param> /// <param name="depth2">How far away from the camera the second point is (For rendering things on top of each other) (Negative values are always drawn)</param>
-			void DrawLineS(float x1, float y1, float x2, float y2, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1) { DrawLine(ScreenPosToPoint(x1, y1), ScreenPosToPoint(x2, y2), col, cha, depth1, depth2); }
-							/// <summary>Draws a line on the command pront from a point in relative screen space to another point in relative screen space</summary> /// <param name="p1">The position of the first point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="p2">The position of the second point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param> /// <param name="depth1">How far away from the camera the first point is (For rendering things on top of each other) (Negative values are always drawn)</param> /// <param name="depth2">How far away from the camera the second point is (For rendering things on top of each other) (Negative values are always drawn)</param>
-			void DrawLineS(VEC2F p1, VEC2F p2, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1) { DrawLine(ScreenPosToPoint(p1), ScreenPosToPoint(p2), col, cha, depth1, depth2); }
-		#pragma endregion
+						/// <summary>Draws a line on the command pront from a point to another point</summary> /// <param name="p1">The position of the first point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="p2">The position of the second point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param> /// <param name="depth1">How far away from the camera the first point is (For rendering things on top of each other) (Negative values are always drawn)</param> /// <param name="depth2">How far away from the camera the second point is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void DrawLine(VEC2F p1, VEC2F p2, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1) { DrawLine(p1.x, p1.y, p2.x, p2.y, col, cha, depth1, depth2); }
+						/// <summary>Draws a line on the command pront from a point in relative screen space to another point in relative screen space</summary> /// <param name="x1">The x position of the first point in relative screen space (Leftmost is 0.0; Rightmost is 1.0)</param> /// <param name="y1">The y position of the first point in relative screen space (Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="x2">The x position of the second point in relative screen space (Leftmost is 0.0; Rightmost is 1.0)</param> /// <param name="y2">The y position of the second point in relative screen space (Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param> /// <param name="depth1">How far away from the camera the first point is (For rendering things on top of each other) (Negative values are always drawn)</param> /// <param name="depth2">How far away from the camera the second point is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void DrawLineS(float x1, float y1, float x2, float y2, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1) { DrawLine(ScreenPosToPoint(x1, y1), ScreenPosToPoint(x2, y2), col, cha, depth1, depth2); }
+						/// <summary>Draws a line on the command pront from a point in relative screen space to another point in relative screen space</summary> /// <param name="p1">The position of the first point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="p2">The position of the second point in relative screen space (Leftmost is 0.0; Rightmost is 1.0; Topmost is 0.0; Bottommost is 1.0)</param> /// <param name="col">The color with which to draw the line (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the line</param> /// <param name="depth1">How far away from the camera the first point is (For rendering things on top of each other) (Negative values are always drawn)</param> /// <param name="depth2">How far away from the camera the second point is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void DrawLineS(VEC2F p1, VEC2F p2, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1) { DrawLine(ScreenPosToPoint(p1), ScreenPosToPoint(p2), col, cha, depth1, depth2); }
+#pragma endregion
 
 		//Uses trigonometry to get the vertices of a regular polygon of 'edges' sides and then connects them with lines
 		//Using relative screen space for the polygon requires the conversion of the center point and the radius
 		//	but due to the radius not being a point, it must be defined relative to the width or height of the screen
-		#pragma region DrawRPoly
+#pragma region DrawRPoly
 						/// <summary>
 						/// Draws a regular polygon to the screen
 						/// </summary>
@@ -618,21 +707,21 @@ namespace cmde
 						/// <param name="cha">The character with which to draw the polygon</param>
 						/// <param name="depth">How far away from the camera the shape is (For rendering things on top of each other) (Negative values are always drawn)</param>
 		void DrawRPoly(float cx, float cy, short edges, float rad, float rot = 0, short col = 0x000F, short cha = 0x2588, float depth = -1)
+		{
+			float as = (360.0f / edges) * RAD;
+			float max = (360.0f + rot) * RAD;
+			for (float a = rot * RAD; a < max; a += as)
 			{
-				float as = (360.0f / edges) * RAD;
-				float max = (360.0f + rot) * RAD;
-				for (float a = rot * RAD; a < max; a += as)
-				{
-					DrawLine(cos(a) * rad + cx, sin(a) * rad + cy, cos(a + as) * rad + cx, sin(a + as) * rad + cy, col, cha, depth, depth);
-				}
+				DrawLine((float)cos(a) * rad + cx, (float)sin(a) * rad + cy, (float)cos(a + as) * rad + cx, (float)sin(a + as) * rad + cy, col, cha, depth, depth);
 			}
-							/// <summary>Draws a regular polygon to the screen</summary> /// <param name="p">The position of the center of the polygon</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
-			void DrawRPoly(VEC2F p, short edges, float rad, float rot = 0, short col = 0x000F, short cha = 0x2588, float depth = -1) { DrawRPoly(p.x, p.y, edges, rad, rot, col, cha, depth); }
-							/// <summary>Draws a regular polygon to the screen using relative screen space</summary> /// <param name="cx">The x position of the center of the polygon in relative screen space</param> /// <param name="cy">The y position of the center of the polygon in relative screen space</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices in relative screen space</param> /// <param name="useY">Whether the radius' size is defined by the screen's height or width ('true' means height is used; 'false' for width)</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
-			void DrawRPolyS(float cx, float cy, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588, float depth = -1) { DrawRPoly(ScreenPosToPoint(cx, cy), edges, (useY ? ScreenPosToPoint(0, rad).y : ScreenPosToPoint(rad, 0).x), rot, col, cha, depth); }
-							/// <summary>Draws a regular polygon to the screen using relative screen space</summary> /// <param name="p">The position of the center of the polygon in relative screen space</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices in relative screen space</param> /// <param name="useY">Whether the radius' size is defined by the screen's height or width ('true' means height is used; 'false' for width)</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
-			void DrawRPolyS(VEC2F p, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588, float depth = -1) { DrawRPolyS(p.x, p.y, edges, rad, useY, rot, col, cha, depth); }
-		#pragma endregion
+		}
+						/// <summary>Draws a regular polygon to the screen</summary> /// <param name="p">The position of the center of the polygon</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void DrawRPoly(VEC2F p, short edges, float rad, float rot = 0, short col = 0x000F, short cha = 0x2588, float depth = -1) { DrawRPoly(p.x, p.y, edges, rad, rot, col, cha, depth); }
+						/// <summary>Draws a regular polygon to the screen using relative screen space</summary> /// <param name="cx">The x position of the center of the polygon in relative screen space</param> /// <param name="cy">The y position of the center of the polygon in relative screen space</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices in relative screen space</param> /// <param name="useY">Whether the radius' size is defined by the screen's height or width ('true' means height is used; 'false' for width)</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void DrawRPolyS(float cx, float cy, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588, float depth = -1) { DrawRPoly(ScreenPosToPoint(cx, cy), edges, (useY ? ScreenPosToPoint(0, rad).y : ScreenPosToPoint(rad, 0).x), rot, col, cha, depth); }
+						/// <summary>Draws a regular polygon to the screen using relative screen space</summary> /// <param name="p">The position of the center of the polygon in relative screen space</param> /// <param name="edges">The amount of edges the polygon has</param> /// <param name="rad">The distance from the center point to each of the vertices in relative screen space</param> /// <param name="useY">Whether the radius' size is defined by the screen's height or width ('true' means height is used; 'false' for width)</param> /// <param name="rot">The angle at which to draw the polygon in degrees</param> /// <param name="col">The color with which to draw the polygon (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw the polygon</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void DrawRPolyS(VEC2F p, short edges, float rad, bool useY, float rot = 0, short col = 0x000F, short cha = 0x2588, float depth = -1) { DrawRPolyS(p.x, p.y, edges, rad, useY, rot, col, cha, depth); }
+#pragma endregion
 
 						/// <summary>
 						/// Writes a line of text starting from a point on the command prompt
@@ -643,7 +732,7 @@ namespace cmde
 						/// <param name="length">The amount of characters in the text</param>
 						/// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param>
 						/// <param name="depth">How far away from the camera the text is (For rendering things on top of each other) (Negative values are always drawn)</param>
-		void WriteText(short x, short y, wchar_t *text, int length, short col = 0x000F, float depth = -1)
+		void WriteText(short x, short y, wchar_t* text, int length, short col = 0x000F, float depth = -1)
 		{
 			for (int i = 0; i < length; i++)
 			{
@@ -651,17 +740,17 @@ namespace cmde
 			}
 		}
 
-		/// <summary>
-		/// Draws a filled in triangle to the command prompt from 3 vertices
-		/// </summary>
-		/// <param name="v1">The first vertice of the triangle</param>
-		/// <param name="v2">The second vertice of the triangle</param>
-		/// <param name="v3">The third vertice of the triangle</param>
-		/// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param>
-		/// <param name="cha">The character with which to draw to that point</param>
-		/// <param name="depth1">How far away from the camera the first vertice is (For rendering things on top of each other) (Negative values are always drawn)</param>
-		/// <param name="depth2">How far away from the camera the second vertice is (For rendering things on top of each other) (Negative values are always drawn)</param>
-		/// <param name="depth3">How far away from the camera the third vertice is (For rendering things on top of each other) (Negative values are always drawn)</param>
+						/// <summary>
+						/// Draws a filled in triangle to the command prompt from 3 vertices
+						/// </summary>
+						/// <param name="v1">The first vertice of the triangle</param>
+						/// <param name="v2">The second vertice of the triangle</param>
+						/// <param name="v3">The third vertice of the triangle</param>
+						/// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param>
+						/// <param name="cha">The character with which to draw to that point</param>
+						/// <param name="depth1">How far away from the camera the first vertice is (For rendering things on top of each other) (Negative values are always drawn)</param>
+						/// <param name="depth2">How far away from the camera the second vertice is (For rendering things on top of each other) (Negative values are always drawn)</param>
+						/// <param name="depth3">How far away from the camera the third vertice is (For rendering things on top of each other) (Negative values are always drawn)</param>
 		void DrawTriangle(VEC2F v1, VEC2F v2, VEC2F v3, short col = 0x000F, short cha = 0x2588, float depth1 = -1, float depth2 = -1, float depth3 = -1)
 		{
 			VEC3F list[3] = { VEC3F(v1.x, v1.y, depth1), VEC3F(v2.x, v2.y, depth2), VEC3F(v3.x, v3.y, depth3) };
@@ -719,9 +808,9 @@ namespace cmde
 			float sx1 = (ty != 0 ? ux1 * abs(tx1 / ty) : 0), sy1 = (tx1 != 0 ? uy * abs(ty / tx1) : 0), sx2 = (ty != 0 ? ux2 * abs(tx2 / ty) : 0), sy2 = (tx2 != 0 ? uy * abs(ty / tx2) : 0);
 			DrawLine(b1.x, b1.y, b2.x, b2.y, col, cha, b1.z, b2.z);
 			Draw(t1.x, t1.y, col, cha, t1.z);
-			tx1 = fmod(ux1 - fmod(b1.x, 1.0f), 1.0f);
-			tx2 = fmod(ux2 - fmod(b2.x, 1.0f), 1.0f);
-			ty = fmod(uy - fmod(b1.y, 1.0f), 1.0f);
+			tx1 = (float)fmod(ux1 - fmod(b1.x, 1.0f), 1.0f);
+			tx2 = (float)fmod(ux2 - fmod(b2.x, 1.0f), 1.0f);
+			ty = (float)fmod(uy - fmod(b1.y, 1.0f), 1.0f);
 
 			LINEAR b1Depth = LinearFunction(b1.y, b1.z, t1.y, t1.z);
 			//+1 on x for line 1 & +? on y for line 1
@@ -742,7 +831,7 @@ namespace cmde
 				DrawLine(x1, y, x2, y, col, cha, b1Depth.f(y).y, b2Depth.f(y).y);
 			}
 		}
-	#pragma endregion
+#pragma endregion
 
 						/// <summary>
 						/// Converts a relative screen space position ('0.0 - 1.0' is 'Left - Right' or 'Top - Bottom') to a point in the pixel grid ('0.0 - screenSize.X' is 'Left - Right' and '0.0 - screenSize.Y' is 'Top - Bottom')
@@ -753,8 +842,8 @@ namespace cmde
 		{
 			return { x * screenSize.X, y * screenSize.Y };
 		}
-							///<summary>Converts a relative screen space position ('0.0 - 1.0' is 'Left - Right' or 'Top - Bottom') to a point in the pixel grid ('0.0 - screenSize.X' is 'Left - Right' and '0.0 - screenSize.Y' is 'Top - Bottom')</summary> /// <param name="p">The value (If x or y is outside of range [0.0; 1.0] the resulting pixel will be out of the screen)</param>
-			VEC2F ScreenPosToPoint(VEC2F p) { return { p.x * screenSize.X, p.y * screenSize.Y }; }
+						///<summary>Converts a relative screen space position ('0.0 - 1.0' is 'Left - Right' or 'Top - Bottom') to a point in the pixel grid ('0.0 - screenSize.X' is 'Left - Right' and '0.0 - screenSize.Y' is 'Top - Bottom')</summary> /// <param name="p">The value (If x or y is outside of range [0.0; 1.0] the resulting pixel will be out of the screen)</param>
+		VEC2F ScreenPosToPoint(VEC2F p) { return { p.x * screenSize.X, p.y * screenSize.Y }; }
 
 						/// <summary>Fills the entire console with the character and color in the 'empty' variable</summary>
 		void ClearFrame()
@@ -787,8 +876,8 @@ namespace cmde
 			_pixelCount = screenWidth * screenHeight;
 			screen = new CHAR_INFO[pixelCount];
 			//Setting up the console window (Not entirely sure about what everything here does, had to copy most of it due to the complexity)
-	#pragma region ConsoleWindowSetup
-			//Creates an object that then basically functions as the console
+#pragma region ConsoleWindowSetup
+		//Creates an object that then basically functions as the console
 			console = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 			//Set the window size to the smallest possible
 			sr = { 0, 0, 1, 1 };
@@ -887,7 +976,7 @@ namespace cmde
 				ThrowError(L"SetConsoleWindowInfo");
 				return;
 			}
-	#pragma endregion
+#pragma endregion
 		}
 
 		//Used the same name as a function in 'Windows.h', this is horrible practice
@@ -900,8 +989,8 @@ namespace cmde
 		{
 			::SetWindowPos(window, NULL, x, y, NULL, NULL, SWP_NOSIZE);
 		}
-							/// <summary>Moves the command prompt window to a specific point on the screen (This function has the same name as one in 'Windows.h', if by any chance you meant to use that one, use '::SetWindowPos')</summary> /// <param name="x">Moves the window so that there are this many pixels between the edge of the screen and the left side of the window (0 pixels seems to actually be -7)</param> /// <param name="y">Moves the window so that there are this many pixels between the edge of the screen and the top side of the window (In order to hide the Windows top bar use -29)</param>
-			void SetWindowPos(VEC2F v) { ::SetWindowPos(window, NULL, (int)v.x, (int)v.y, NULL, NULL, SWP_NOSIZE); }
+						/// <summary>Moves the command prompt window to a specific point on the screen (This function has the same name as one in 'Windows.h', if by any chance you meant to use that one, use '::SetWindowPos')</summary> /// <param name="x">Moves the window so that there are this many pixels between the edge of the screen and the left side of the window (0 pixels seems to actually be -7)</param> /// <param name="y">Moves the window so that there are this many pixels between the edge of the screen and the top side of the window (In order to hide the Windows top bar use -29)</param>
+		void SetWindowPos(VEC2F v) { ::SetWindowPos(window, NULL, (int)v.x, (int)v.y, NULL, NULL, SWP_NOSIZE); }
 
 		//Used the same name as a function in 'Windows.h', this is horrible practice
 						/// <summary>
@@ -915,8 +1004,8 @@ namespace cmde
 			GetWindowInfo(window, &winInfo);
 			::SetWindowPos(window, NULL, winInfo.rcWindow.left + x, winInfo.rcWindow.top + y, NULL, NULL, SWP_NOSIZE);
 		}
-							/// <summary>Moves the command prompt window by a number of pixels on the screen (This function has the same name as one in 'Windows.h', if by any chance you meant to use that one, use '::MoveWindow')</summary> /// <param name="x">Moves the window this many pixels to the right (Negative numbers go to the left)</param> /// <param name="y">Moves the window this many pixels down (Negative numbers go up)</param>
-			void MoveWindow(VEC2F v) { MoveWindow((short)v.x, (short)v.y); }
+						/// <summary>Moves the command prompt window by a number of pixels on the screen (This function has the same name as one in 'Windows.h', if by any chance you meant to use that one, use '::MoveWindow')</summary> /// <param name="x">Moves the window this many pixels to the right (Negative numbers go to the left)</param> /// <param name="y">Moves the window this many pixels down (Negative numbers go up)</param>
+		void MoveWindow(VEC2F v) { MoveWindow((short)v.x, (short)v.y); }
 
 		void SetTitle(const wchar_t* msg)
 		{
@@ -930,12 +1019,12 @@ namespace cmde
 			SetConsoleTitle(tmp);
 		}
 
-						/// <summary>0 -> nothing ; 1 -> released ; 2 -> pressed ; 3 -> held ; MOUSE_X & MOUSE_Y -> point on the command prompt</summary>
+						/// <summary>0 -> nothing ; 1 -> released ; 2 -> pressed ; 3 -> held ; MOUSE_X and MOUSE_Y -> point on the command prompt</summary>
 		void ReadInputs()
 		{
 			short tx = inputs[MOUSE_X];
 			short ty = inputs[MOUSE_Y];
-			for (auto &o : inputs)
+			for (auto& o : inputs)
 			{
 				switch (o.second)
 				{
@@ -974,7 +1063,7 @@ namespace cmde
 						continue;
 					}
 
-					k->second = (buf.Event.KeyEvent.bKeyDown == false ? 1 :(k->second <= 1 ? 2 : 3));
+					k->second = (buf.Event.KeyEvent.bKeyDown == false ? 1 : (k->second <= 1 ? 2 : 3));
 
 					if (buf.Event.KeyEvent.dwControlKeyState > 0)
 					{
@@ -999,7 +1088,7 @@ namespace cmde
 							inputs[MOUSE_DCLICK] = 1;
 							break;
 						case MOUSE_WHEELED:
-							inputs[MOUSE_SCROLL] = (buf.Event.MouseEvent.dwButtonState >> 31 == 0 ? 1: -1);inputs[MOUSE_SCROLL] = -1;
+							inputs[MOUSE_SCROLL] = (buf.Event.MouseEvent.dwButtonState >> 31 == 0 ? 1 : -1); inputs[MOUSE_SCROLL] = -1;
 							break;
 						case 0: //Means a button was clicked
 							for (int i = 0; i < 8; i++)
@@ -1073,14 +1162,14 @@ namespace cmde
 						/// <param name="openFile">The variable to which this function will write the output file to if the user picks a file</param>
 						/// <param name="fileType">The file type the user will be asked for</param>
 						/// <param name="fileExtensions">The internal file type info. Must be formatted correctly: L"*.txt;*.jpg;*.png"</param>
-		bool PromptFileSearch(FILE *openFile, const wchar_t* fileType, const wchar_t* fileExtensions)
+		bool PromptFileSearch(FILE* openFile, const wchar_t* fileType, const wchar_t* fileExtensions)
 		{
 			openFile->fileName.lStructSize = sizeof(OPENFILENAMEW);
 			openFile->fileName.hwndOwner = window;
-			wchar_t temp[128] = {0};
+			wchar_t temp[128] = { 0 };
 			swprintf(temp, 128, L"%ls (%ls)%c%ls%c%c", fileType, fileExtensions, '\0', fileExtensions, '\0', '\0');
 			openFile->fileName.lpstrFilter = temp;
-			wchar_t flnm[MAX_PATH] = {0};
+			wchar_t flnm[MAX_PATH] = { 0 };
 			flnm[0] = L'\0';
 			openFile->fileName.lpstrFile = flnm;
 			openFile->fileName.nMaxFile = MAX_PATH;
@@ -1090,22 +1179,115 @@ namespace cmde
 			openFile->fileName.lpstrTitle = temp2;
 			if (GetOpenFileNameW(&(openFile->fileName)))
 			{
-				HANDLE fileHandle = CreateFileW(openFile->fileName.lpstrFile, GENERIC_READ,
-					0, (LPSECURITY_ATTRIBUTES)NULL,
-					OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
-					(HANDLE)NULL);
+				HANDLE fileHandle = CreateFileW(
+					openFile->fileName.lpstrFile,	// Filename
+					GENERIC_READ,					// Desired access
+					0,								// Share mode
+					NULL,							// Security attributes
+					OPEN_EXISTING,					// Opens a file only if it already exist
+					FILE_ATTRIBUTE_NORMAL,			// Flags and attributes
+					NULL);							// Template file handle
 				if (fileHandle != INVALID_HANDLE_VALUE)
 				{
 					openFile->fileHandle = fileHandle;
+
+					wchar_t fullDirectory[MAX_PATH] = { 0 };
+					int length1 = swprintf(fullDirectory, MAX_PATH, L"%ls", openFile->fileName.lpstrFile);
+					int lastSlash = 0;
+					for (int i = 0; i < length1; i++)
+					{
+						if (fullDirectory[i] == L'\\')
+						{
+							lastSlash = i;
+						}
+					}
+					bool extension = false;
+					int index = 0;
+					for (int i = lastSlash + 1; i < length1; i++)
+					{
+						if (!extension)
+						{
+							if (fullDirectory[i] == L'.')
+							{
+								extension = true;
+								index = -1;
+							}
+							else
+							{
+								openFile->name[index] = fullDirectory[i];
+							}
+						}
+						else
+						{
+							openFile->extension[index] = fullDirectory[i];
+						}
+						index++;
+					}
 					return true;
 				}
 			}
 			return false;
 		}
 
+						/// <summary>
+						/// Opens a Windows Explorer window, allowing the user to choose the name and location of the file to save to, with the designated file type. Will return true if a file is chosen.
+						/// </summary>
+						/// <param name="saveFile">The variable to which this function will write the output file to if the user picks a file</param>
+						/// <param name="fileType">The file type the user will be asked for</param>
+						/// <param name="fileExtensions">The internal file type info. Must be formatted correctly: L"*.txt;*.jpg;*.png"</param>
+		bool PromptFileSave(FILE* saveFile, const wchar_t* fileType, const wchar_t* fileExtensions)
+		{
+			saveFile->fileName.lStructSize = sizeof(OPENFILENAMEW);
+			saveFile->fileName.hwndOwner = window;
+			wchar_t temp[128] = { 0 };
+			swprintf(temp, 128, L"%ls (%ls)%c%ls%c%c", fileType, fileExtensions, '\0', fileExtensions, '\0', '\0');
+			saveFile->fileName.lpstrFilter = temp;
+			wchar_t flnm[MAX_PATH] = { 0 };
+			flnm[0] = L'\0';
+			saveFile->fileName.lpstrFile = flnm;
+			saveFile->fileName.nMaxFile = MAX_PATH;
+			saveFile->fileName.lpstrTitle = L"Save as";
+			wchar_t temp2[128] = { 0 };
+			int extensionsLength = swprintf(temp2, 128, L"%ls", fileExtensions);
+			for (int i = 0; i < extensionsLength; i++)
+			{
+				if (fileExtensions[i] == L'.')
+				{
+					i++;
+					for (int  j = 0; j + i < extensionsLength; j++)
+					{
+						if (fileExtensions[j + i] == L';')
+						{
+							temp2[j] = L'\0';
+							break;
+						}
+						temp2[j] = fileExtensions[j + i];
+					}
+					break;
+				}
+			}
+			saveFile->fileName.lpstrDefExt = temp2;
+			if (GetSaveFileNameW(&(saveFile->fileName)))
+			{
+				HANDLE fileHandle = CreateFileW(
+					saveFile->fileName.lpstrFile,	// Filename
+					GENERIC_WRITE,					// Desired access
+					0,								// Share mode
+					NULL,							// Security attributes
+					CREATE_NEW,						// Creates a new file, only if it doesn't already exist
+					FILE_ATTRIBUTE_NORMAL,			// Flags and attributes
+					NULL);							// Template file handle
+				if (fileHandle != INVALID_HANDLE_VALUE)
+				{
+					saveFile->fileHandle = fileHandle;
+					return true;
+				}
+			}
+			return false;
+		}
 
 		//General useful functions
-	#pragma region MiscFunctions
+#pragma region MiscFunctions
 						/// <summary>Elevates a number to the power of 2</summary>
 		static double Pow2(double value) { return value * value; }
 						/// <summary>Calculates the dot product of 2 vectors</summary>
@@ -1113,7 +1295,7 @@ namespace cmde
 						/// <summary>Calculates the orthagonal vector of a plane defined by 2 vectors (Index = v1; Middle = v2; Thumb = result)</summary>
 		static VEC3F CrossProduct(VEC3F v1, VEC3F v2) { return { v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x }; }
 						/// <summary>Calculates the length of a vector</summary>
-		static float Magnitude(VEC4F v) { return sqrt(abs(DotProduct(v, v))); }
+		static float Magnitude(VEC4F v) { return (float)sqrt(abs(DotProduct(v, v))); }
 						/// <summary>Limits 'value' to the range between 'low' and 'high'</summary>
 		static float Clamp(float value, float low, float high) { return (value < low ? low : (high < value ? high : value)); }
 						/// <summary>Gives the sign of a value (Positive = 1; Negative = -1; Other = itself)</summary>
@@ -1121,11 +1303,11 @@ namespace cmde
 						/// <summary>Gives the sign of a value (Positive = 1; Negative = -1; Other = itself)</summary>
 		static double Sign(double value) { return (value > 0.0 ? 1.0 : (value < 0.0 ? -1.0 : value)); }
 						/// <summary>Calculates the angle between 2 vectors in degrees</summary>
-		static float Angle(VEC4F v1, VEC4F v2) { return acos(Clamp(DotProduct(v1, v2) / (Magnitude(v2) * Magnitude(v1)), -1.0f, 1.0f)) * DEG; }
+		static float Angle(VEC4F v1, VEC4F v2) { return (float)acos(Clamp(DotProduct(v1, v2) / (Magnitude(v2) * Magnitude(v1)), -1.0f, 1.0f)) * DEG; }
 						/// <summary>Gives a vector of length 1 in the same direction</summary>
 		static VEC4F Normalize(VEC4F v) { return v / Magnitude(v); }
 
-	#pragma region LinearFunction
+#pragma region LinearFunction
 						/// <summary>Calculates the y value of point x on the line defined by the 2 points provided (Returns y1 if x1 == x2)</summary>
 		static float LinearFunction(float x1, float y1, float x2, float y2, float x)
 		{
@@ -1141,10 +1323,10 @@ namespace cmde
 			return { x, LinearFunction(p1.x, p1.y, p2.x, p2.y, x), LinearFunction(p1.x, p1.z, p2.x, p2.z, x), LinearFunction(p1.x, p1.w, p2.x, p2.w, x) };
 		}
 		//Warn if both points have the same X and thus can't be made into a linear function
-							/// <summary>Calculates the y value of point x on the line defined by the 2 points provided and inserts it into 'output' (Returns false if x1 == x2)</summary>
-			static bool LinearFunction(float x1, float y1, float x2, float y2, float x, float* output) { if (x1 == x2) { return false; } *output = LinearFunction(x1, y1, x2, y2, x); return true; }
-							/// <summary>Calculates the point at 'x' on the line defined by the 2 points provided and inserts it into 'output' (Returns false if p1.x == p2.x)</summary>
-			static bool LinearFunction(VEC4F p1, VEC4F p2, float x, VEC4F* output) { if (p1.x == p2.x) { return false; } *output = LinearFunction(p1, p2, x); return true; }
+						/// <summary>Calculates the y value of point x on the line defined by the 2 points provided and inserts it into 'output' (Returns false if x1 == x2)</summary>
+		static bool LinearFunction(float x1, float y1, float x2, float y2, float x, float* output) { if (x1 == x2) { return false; } *output = LinearFunction(x1, y1, x2, y2, x); return true; }
+						/// <summary>Calculates the point at 'x' on the line defined by the 2 points provided and inserts it into 'output' (Returns false if p1.x == p2.x)</summary>
+		static bool LinearFunction(VEC4F p1, VEC4F p2, float x, VEC4F* output) { if (p1.x == p2.x) { return false; } *output = LinearFunction(p1, p2, x); return true; }
 						/// <summary>Generates the linear function based on 'x' defined by the 2 points provided (Returns y=0 if x1 == x2)</summary>
 		static LINEAR LinearFunction(float x1, float y1, float x2, float y2)
 		{
@@ -1161,13 +1343,13 @@ namespace cmde
 			return { VEC4F(1, (p2.y - p1.y) * t, (p2.z - p1.z) * t, (p2.w - p1.w) * t), VEC4F(0, -(p2.y - p1.y) * t * p1.x + p1.y, -(p2.z - p1.z) * t * p1.x + p1.z, -(p2.w - p1.w) * t * p1.x + p1.w) };
 		}
 		//Warn if both points have the same X and thus can't be made into a linear function
-							/// <summary>Generates the linear function based on 'x' defined by the 2 points provided and inserts it into 'output' (Returns false if x1 == x2)</summary>
-			static bool LinearFunction(float x1, float y1, float x2, float y2, LINEAR* output) { if (x1 == x2) { return false; } *output = LinearFunction(x1, y1, x2, y2); return true; }
-							/// <summary>Generates the linear function based on 'x' defined by the 2 points provided and inserts it into 'output' (Returns false if p1.x == p2.x)</summary>
-			static bool LinearFunction(VEC4F p1, VEC4F p2, LINEAR* output) { if (p1.x == p2.x) { return false; } *output = LinearFunction(p1, p2); return true; }
-	#pragma endregion
+						/// <summary>Generates the linear function based on 'x' defined by the 2 points provided and inserts it into 'output' (Returns false if x1 == x2)</summary>
+		static bool LinearFunction(float x1, float y1, float x2, float y2, LINEAR* output) { if (x1 == x2) { return false; } *output = LinearFunction(x1, y1, x2, y2); return true; }
+						/// <summary>Generates the linear function based on 'x' defined by the 2 points provided and inserts it into 'output' (Returns false if p1.x == p2.x)</summary>
+		static bool LinearFunction(VEC4F p1, VEC4F p2, LINEAR* output) { if (p1.x == p2.x) { return false; } *output = LinearFunction(p1, p2); return true; }
+#pragma endregion
 
-						/// <summary>Calculates the point at 'x' on the line defined by the 3 points provided and inserts it into 'output' (Returns false if there is any repeat value in p1.x, p2.x, and p3.x)<summary>
+						/// <summary>Calculates the point at 'x' on the line defined by the 3 points provided and inserts it into 'output' (Returns false if there is any repeat value in p1.x, p2.x, and p3.x)</summary>
 		static bool QuadraticFunction(VEC2F p1, VEC2F p2, VEC2F p3, float x, VEC2F* output)
 		{
 			if (p1.x == p2.x || p1.x == p3.x || p2.x == p3.x)
@@ -1185,7 +1367,7 @@ namespace cmde
 			*output = { x, a * x * x + b * x + c };
 			return true;
 		}
-						/// <summary>Generates the quadratic function based on 'x' defined by the 3 points provided and inserts it into 'output' (Returns false if there is any repeat value in p1.x, p2.x, and p3.x)<summary>
+						/// <summary>Generates the quadratic function based on 'x' defined by the 3 points provided and inserts it into 'output' (Returns false if there is any repeat value in p1.x, p2.x, and p3.x)</summary>
 		static bool QuadraticFunction(VEC4F p1, VEC4F p2, VEC4F p3, QUADRATIC* output)
 		{
 			if (p1.x == p2.x || p1.x == p3.x || p2.x == p3.x)
@@ -1207,9 +1389,9 @@ namespace cmde
 						/// <summary>Assumes the XYZ axis are set up correctly (X+ is left when Z+ is forwards and Y+ is up)</summary>
 		static VEC3F VectorFromAngles(float h, float v)
 		{
-			return { sin(h * RAD) * cos(v * RAD), sin(v * RAD), cos(h * RAD) * cos(v * RAD) };
+			return { (float)(sin(h * RAD) * cos(v * RAD)), (float)sin(v * RAD), (float)(cos(h * RAD) * cos(v * RAD)) };
 		}
-	#pragma endregion
+#pragma endregion
 	};
 }
 
@@ -1244,7 +1426,7 @@ public:
 	}
 
 	void Update()
-	{	
+	{
 		DrawRPoly(c, edges, r, (float)angle);
 		angle++;
 
@@ -1258,647 +1440,6 @@ public:
 };
 
 #include <vector>
-
-class Test3DNoCam : public cmde::CMDEngine
-{
-	struct Triangle
-	{
-		cmde::VEC3F vertices[3];
-		bool visibleSides[3];
-		short color;
-
-		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3, short col = 0x00FF)
-		{
-			vertices[0] = p1;
-			vertices[1] = p2;
-			vertices[2] = p3;
-			visibleSides[0] = true;
-			visibleSides[1] = true;
-			visibleSides[2] = true;
-			color = col;
-		}
-
-		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3, short col, bool s1, bool s2, bool s3)
-		{
-			vertices[0] = p1;
-			vertices[1] = p2;
-			vertices[2] = p3;
-			visibleSides[0] = s1;
-			visibleSides[1] = s2;
-			visibleSides[2] = s3;
-			color = col;
-		}
-	};
-
-	struct Mesh
-	{
-		std::vector<Triangle> triangles;
-		cmde::VEC3F aabb[2];
-		cmde::VEC3F center;
-
-		Mesh(std::vector<Triangle> triangles = std::vector<Triangle>())
-		{
-			this->triangles = triangles;
-
-			for (Triangle& t : triangles)
-			{
-				for (short i = 0; i < 3; i++)
-				{
-					RecalculateAABB(t.vertices[i]);
-				}
-			}
-		}
-
-		void RecalculateAABB(cmde::VEC3F p)
-		{
-			aabb[0].x = min(p.x, aabb[0].x);
-			aabb[0].y = min(p.y, aabb[0].y);
-			aabb[0].z = min(p.z, aabb[0].z);
-			aabb[1].x = max(p.x, aabb[1].x);
-			aabb[1].y = max(p.y, aabb[1].y);
-			aabb[1].z = max(p.z, aabb[1].z);
-			center = aabb[0] + (aabb[1] - aabb[0]) * 0.5f;
-		}
-		void AddTriangle(Triangle t) { triangles.push_back(t); }
-		void AddTriangles(std::vector<Triangle> triangles) { this->triangles.insert(this->triangles.end(), triangles.begin(), triangles.end()); }
-	};
-
-	static bool LinePlaneIntersection(cmde::VEC3F planePoint, cmde::VEC3F planeNormal, cmde::VEC3F lineOrigin, cmde::VEC3F lineDirection, cmde::VEC3F* output)
-	{
-		planeNormal = Normalize(planeNormal);
-		float nd = DotProduct(planeNormal, lineDirection);
-		if (nd == 0)
-			return false;
-		//t = (N * a - N * O) / nd
-		float t = (DotProduct(planeNormal, planePoint) - DotProduct(planeNormal, lineOrigin)) / nd;
-		*output = lineOrigin + lineDirection * t;
-		return true;
-	}
-
-	static std::vector<Triangle> ClipTriangles(short tempInBoundsCount, std::vector<Triangle> ts, cmde::VEC3F cameraPos, cmde::VEC3F inBounds[6])
-	{
-		//'i' SHOULD BE THE AMOUNT OF 'inBounds' THERE ARE (6), BUT I'VE ONLY GOT 4 SO FAR
-		for (short i = 0; i < tempInBoundsCount; i++)
-		{
-			std::vector<Triangle> temp;
-			for (Triangle& t : ts)
-			{
-				std::vector<Triangle> o = ClipTriangle(t, cameraPos, inBounds[i]);
-				temp.insert(temp.end(), o.begin(), o.end());
-			}
-			ts = temp;
-		}
-		return ts;
-	}
-
-	static std::vector<Triangle> ClipTriangle(Triangle t, cmde::VEC3F cameraPos, cmde::VEC3F inBounds)
-	{
-		bool oob[3] = { false };
-		short c = 0;
-		std::vector<Triangle> output = std::vector<Triangle>();
-		for (short i = 0; i < 3; i++)
-		{
-			if (DotProduct(t.vertices[i] - cameraPos, inBounds) < 0)
-			{
-				oob[i] = true;
-				c++;
-			}
-		}
-
-		//Apparently the inside of a switch is all considered the same scope, so you can't have 2 variables with the same name in different cases
-		cmde::VEC3F g;
-		cmde::VEC3F g1;
-		cmde::VEC3F g2;
-		cmde::VEC3F new1;
-		cmde::VEC3F new2;
-		//Must flip the booleans around if c is 2 because then the one that is inside the bounds is the one that's needed
-		if (c == 2)
-		{
-			for (short i = 0; i < 3; i++)
-			{
-				oob[i] = !oob[i];
-			}
-		}
-		short o = 0;
-		for (short i = 0; i < 3; i++)
-		{
-			if (oob[i] == true)
-			{
-				o = i;
-				g = t.vertices[i];
-				g1 = t.vertices[(i + 1) % 3];
-				g2 = t.vertices[(i + 2) % 3];
-				break;
-			}
-		}
-		LinePlaneIntersection(cameraPos, inBounds, g, g1 - g, &new1);
-		LinePlaneIntersection(cameraPos, inBounds, g, g2 - g, &new2);
-
-		switch (c)
-		{
-		case 0:
-			output.push_back(t);
-			break;
-		case 3:
-			//nothing
-			break;
-		case 1:
-			output.push_back(Triangle(new1, g1, g2, t.color, true && t.visibleSides[o], true && t.visibleSides[(o + 1) % 3], false));
-			output.push_back(Triangle(new1, g2, new2, t.color, false, true && t.visibleSides[(o + 2) % 3], false));
-			break;
-		case 2:
-			output.push_back(Triangle(g, new1, new2, t.color, true && t.visibleSides[o], false, true && t.visibleSides[(o + 2) % 3]));
-			break;
-		}
-		return output;
-	}
-
-	cmde::VEC2F ProjectionMatrixify(cmde::VEC3F v, float farPlane, float nearPlane)
-	{
-		float fov = 90.0f;
-		float f = 1.0f / tanf(fov * 0.5f * RAD);
-		if (v.z != 0)
-			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / -v.z, (f * v.y) / -v.z };
-		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y) };
-	}
-
-	static cmde::VEC2F ProjectionMatrixify(cmde::VEC3F v, float farPlane, float nearPlane, COORD screenSize)
-	{
-		float fov = 90.0f;
-		float f = 1.0f / tanf(fov * 0.5f * RAD);
-		if (v.z != 0)
-			return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x) / -v.z, (f * v.y) / -v.z };
-		return { (((float)screenSize.Y / (float)screenSize.X) * f * v.x), (f * v.y) };
-	}
-
-	///<summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one<\summary>
-	float DepthConversion(float depth)
-	{
-		return (depth * farPlane) / (depth * (farPlane - nearPlane) + nearPlane);
-	}
-
-public:
-	Mesh shape1;
-	Mesh shape2;
-	Mesh shape3;
-	Mesh shape4;
-	Mesh shape5;
-	cmde::VEC3F pos;
-	cmde::VEC2F facing;
-	cmde::VEC2F fov;
-	cmde::VEC3F sightLimitL;
-	cmde::VEC3F sightLimitT;
-	cmde::VEC3F forwards;
-	cmde::VEC3F left;
-	cmde::VEC3F up;
-	bool myRenderingSystem;
-	bool wireframe;
-	float nearPlane;
-	float farPlane;
-
-
-	Test3DNoCam(short screenWidth, short screenHeight, short fontWidth, short fontHeight) : cmde::CMDEngine(screenWidth, screenHeight, fontWidth, fontHeight, true, true, FPS60)
-	{
-		shape1 = Mesh();
-		shape2 = Mesh();
-		shape3 = Mesh();
-		shape4 = Mesh();
-		shape5 = Mesh();
-		pos = { 0.5f, 0.5f, -2 };
-		fov = { 90, 90 };
-		facing = { 0, 0 };
-		//X+ is left when Z+ is forwards and Y+ is up
-		forwards = VectorFromAngles(facing.x, facing.y);	//  0,  0,  1
-		left = VectorFromAngles(facing.x + 90, 0);			//  1,  0,  0
-		up = VectorFromAngles(facing.x, facing.y + 90);		//  0,  1,  0
-		sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
-		sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
-		myRenderingSystem = false;
-		wireframe = false;
-		emptyChar.Attributes = 0x0088;
-		nearPlane = 0.1f;
-		farPlane = 200.0f;
-	}
-
-	void Setup()
-	{
-		//1x1x1 Cube (with outline)
-		/*
-		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, true, false, true });
-		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 }, true, true, false });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, true, false, true });
-		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, true, true, false });
-		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 1, 0 }, { 1, 0, 1 }, true, false, true });
-		shape1.AddTriangle({ { 1, 1, 0 }, { 1, 1, 1 }, { 1, 0, 1 }, true, true, false });
-		shape1.AddTriangle({ { 0, 1, 0 }, { 0, 1, 1 }, { 1, 1, 1 }, true, true, false });
-		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 1 }, { 1, 1, 0 }, false, true, true });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 1 }, true, true, false });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 }, false, true, true });
-		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, true, true, false });
-		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 }, false, true, true });
-		*/
-
-		//1x1x1 Cube
-		/*
-		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, 0x00AA });
-		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 }, 0x00AA });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, 0x00AA });
-		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, 0x00AA });
-		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 1, 0 }, { 1, 0, 1 }, 0x00AA });
-		shape1.AddTriangle({ { 1, 1, 0 }, { 1, 1, 1 }, { 1, 0, 1 }, 0x00AA });
-		shape1.AddTriangle({ { 0, 1, 0 }, { 0, 1, 1 }, { 1, 1, 1 }, 0x00AA });
-		shape1.AddTriangle({ { 0, 1, 0 }, { 1, 1, 1 }, { 1, 1, 0 }, 0x00AA });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 1 }, 0x00AA });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 }, 0x00AA });
-		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, 0x00AA });
-		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 }, 0x00AA });
-		*/
-
-		//2x2x2 Cube (With Z+2 offset)
-		/*
-		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 2, 2 }, { 2, 0, 2 }, 0x0099 });
-		shape2.AddTriangle({ { 0, 2, 2 }, { 2, 2, 2 }, { 2, 0, 2 }, 0x0099 });
-		shape2.AddTriangle({ { 0, 0, 2 }, { 2, 0, 2 }, { 0, 0, 4 }, 0x0099 });
-		shape2.AddTriangle({ { 2, 0, 2 }, { 2, 0, 4 }, { 0, 0, 4 }, 0x0099 });
-		shape2.AddTriangle({ { 2, 0, 2 }, { 2, 2, 2 }, { 2, 0, 4 }, 0x0099 });
-		shape2.AddTriangle({ { 2, 2, 2 }, { 2, 2, 4 }, { 2, 0, 4 }, 0x0099 });
-		shape2.AddTriangle({ { 0, 2, 2 }, { 0, 2, 4 }, { 2, 2, 4 }, 0x0099 });
-		shape2.AddTriangle({ { 0, 2, 2 }, { 2, 2, 4 }, { 2, 2, 2 }, 0x0099 });
-		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 0, 4 }, { 0, 2, 4 }, 0x0099 });
-		shape2.AddTriangle({ { 0, 0, 2 }, { 0, 2, 4 }, { 0, 2, 2 }, 0x0099 });
-		shape2.AddTriangle({ { 0, 0, 4 }, { 2, 0, 4 }, { 2, 2, 4 }, 0x0099 });
-		shape2.AddTriangle({ { 0, 0, 4 }, { 2, 2, 4 }, { 0, 2, 4 }, 0x0099 });
-		*/
-
-		//1x20x1 Pole (Rainbow)
-		/*
-		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 0 }, { 1, -10, 0 }, 0x0066 });
-		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, -10, 0 }, 0x0077 });
-		shape1.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 }, 0x0055 });
-		shape1.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 }, 0x0044 });
-		shape1.AddTriangle({ { 1, -10, 0 }, { 1, 10, 0 }, { 1, -10, 1 }, 0x0033 });
-		shape1.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, -10, 1 }, 0x0022 });
-		shape1.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 }, 0x0011 });
-		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 }, 0x0000 });
-		shape1.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 10, 1 }, 0x0099 });
-		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 1 }, { 0, 10, 0 }, 0x00AA });
-		shape1.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 10, 1 }, 0x00BB });
-		shape1.AddTriangle({ { 0, -10, 1 }, { 1, 10, 1 }, { 0, 10, 1 }, 0x00CC });
-		*/
-
-		//1x20x1 Pole
-		/*
-		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 0 }, { 1, -10, 0 }, 0x0077 });
-		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, -10, 0 }, 0x0077 });
-		shape1.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 1, -10, 0 }, { 1, 10, 0 }, { 1, -10, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, -10, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 }, 0x0077 });
-		shape1.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 10, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 10, 1 }, { 0, 10, 0 }, 0x0077 });
-		shape1.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 10, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 0, -10, 1 }, { 1, 10, 1 }, { 0, 10, 1 }, 0x0077 });
-		*/
-
-		//20x 1x1x1 Cubes (In shape of 1x20x1 pole)
-		/*
-		float b = -10;
-		float t = -9;
-		for (int i = 0; i < 20; i++)
-		{
-			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 0 + 2, t, 0 }, { 1 + 2, b, 0 }, 0x0066 });
-			shape2.AddTriangle({ { 0 + 2, t, 0 }, { 1 + 2, t, 0 }, { 1 + 2, b, 0 }, 0x0077 });
-			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 1 + 2, b, 0 }, { 0 + 2, b, 1 }, 0x0055 });
-			shape2.AddTriangle({ { 1 + 2, b, 0 }, { 1 + 2, b, 1 }, { 0 + 2, b, 1 }, 0x0044 });
-			shape2.AddTriangle({ { 1 + 2, b, 0 }, { 1 + 2, t, 0 }, { 1 + 2, b, 1 }, 0x0033 });
-			shape2.AddTriangle({ { 1 + 2, t, 0 }, { 1 + 2, t, 1 }, { 1 + 2, b, 1 }, 0x0022 });
-			shape2.AddTriangle({ { 0 + 2, t, 0 }, { 0 + 2, t, 1 }, { 1 + 2, t, 1 }, 0x0011 });
-			shape2.AddTriangle({ { 0 + 2, t, 0 }, { 1 + 2, t, 1 }, { 1 + 2, t, 0 }, 0x0000 });
-			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 0 + 2, b, 1 }, { 0 + 2, t, 1 }, 0x0099 });
-			shape2.AddTriangle({ { 0 + 2, b, 0 }, { 0 + 2, t, 1 }, { 0 + 2, t, 0 }, 0x00AA });
-			shape2.AddTriangle({ { 0 + 2, b, 1 }, { 1 + 2, b, 1 }, { 1 + 2, t, 1 }, 0x00BB });
-			shape2.AddTriangle({ { 0 + 2, b, 1 }, { 1 + 2, t, 1 }, { 0 + 2, t, 1 }, 0x00CC });
-			b++;
-			t++;
-		}
-		*/
-
-		//2x 1x10x1 Pole
-		/*
-		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 10, 0 }, { 1, 0, 0 }, 0x0077 });
-		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 0 }, { 1, 0, 0 }, 0x0077 });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 10, 0 }, { 1, 0, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 1, 10, 0 }, { 1, 10, 1 }, { 1, 0, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 0, 10, 0 }, { 0, 10, 1 }, { 1, 10, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 0, 10, 0 }, { 1, 10, 1 }, { 1, 10, 0 }, 0x0077 });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 10, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 10, 1 }, { 0, 10, 0 }, 0x0077 });
-		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 10, 1 }, 0x0077 });
-		shape1.AddTriangle({ { 0, 0, 1 }, { 1, 10, 1 }, { 0, 10, 1 }, 0x0077 });
-
-		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 0, 0 }, { 1, -10, 0 }, 0x0066 });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 0 }, { 1, -10, 0 }, 0x0066 });
-		shape1.AddTriangle({ { 0, -10, 0 }, { 1, -10, 0 }, { 0, -10, 1 }, 0x0066 });
-		shape1.AddTriangle({ { 1, -10, 0 }, { 1, -10, 1 }, { 0, -10, 1 }, 0x0066 });
-		shape1.AddTriangle({ { 1, -10, 0 }, { 1, 0, 0 }, { 1, -10, 1 }, 0x0066 });
-		shape1.AddTriangle({ { 1, 0, 0 }, { 1, 0, 1 }, { 1, -10, 1 }, 0x0066 });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 0, 0, 1 }, { 1, 0, 1 }, 0x0066 });
-		shape1.AddTriangle({ { 0, 0, 0 }, { 1, 0, 1 }, { 1, 0, 0 }, 0x0066 });
-		shape1.AddTriangle({ { 0, -10, 0 }, { 0, -10, 1 }, { 0, 0, 1 }, 0x0066 });
-		shape1.AddTriangle({ { 0, -10, 0 }, { 0, 0, 1 }, { 0, 0, 0 }, 0x0066 });
-		shape1.AddTriangle({ { 0, -10, 1 }, { 1, -10, 1 }, { 1, 0, 1 }, 0x0066 });
-		shape1.AddTriangle({ { 0, -10, 1 }, { 1, 0, 1 }, { 0, 0, 1 }, 0x0066 });
-		*/
-
-		//Donut
-		/*
-		shape4.AddTriangle({ { 5.2 - 5.5, -1.0 + 3, 0 }, { 5.8 - 5.5, -1.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 0 }, { 6.2 - 5.5, -1.2 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 0 }, { 6.5 - 5.5, -1.4 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.5 - 5.5, -1.4 + 3, 0 }, { 6.8 - 5.5, -1.8 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 0 }, { 7.0 - 5.5, -2.6 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 0 }, { 7.0 - 5.5, -3.4 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 7.0 - 5.5, -3.4 + 3, 0 }, { 6.8 - 5.5, -4.2 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.8 - 5.5, -4.2 + 3, 0 }, { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.2 - 5.5, -4.8 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 0 }, { 5.8 - 5.5, -5.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.8 - 5.5, -5.0 + 3, 0 }, { 5.2 - 5.5, -5.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 0 }, { 4.8 - 5.5, -4.8 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 0 }, { 4.5 - 5.5, -4.6 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.5 - 5.5, -4.6 + 3, 0 }, { 4.2 - 5.5, -4.2 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 0 }, { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.0 - 5.5, -2.6 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.0 - 5.5, -2.6 + 3, 0 }, { 4.2 - 5.5, -1.8 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 0 }, { 4.5 - 5.5, -1.4 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.5 - 5.5, -1.4 + 3, 0 }, { 4.8 - 5.5, -1.2 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 0 }, { 5.2 - 5.5, -1.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.7 - 5.5, -1.8 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 1 }, { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.2 - 5.5, -2.4 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 1 }, { 6.2 - 5.5, -3.6 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.0 - 5.5, -4.0 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 1 }, { 5.7 - 5.5, -4.2 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.3 - 5.5, -4.2 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 1 }, { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 5.0 - 5.5, -2.0 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 5.3 - 5.5, -1.8 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.0 - 5.5, -2.6 + 3, 0 }, { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.2 - 5.5, -1.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.2 - 5.5, -1.8 + 3, 0 }, { 4.2 - 5.5, -1.8 + 3, 1 }, { 4.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.5 - 5.5, -1.4 + 3, 0 }, { 4.5 - 5.5, -1.4 + 3, 1 }, { 4.8 - 5.5, -1.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -1.2 + 3, 0 }, { 4.8 - 5.5, -1.2 + 3, 1 }, { 5.2 - 5.5, -1.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.2 - 5.5, -1.0 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.2 - 5.5, -1.0 + 3, 0 }, { 5.2 - 5.5, -1.0 + 3, 1 }, { 5.8 - 5.5, -1.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.8 - 5.5, -1.0 + 3, 0 }, { 5.8 - 5.5, -1.0 + 3, 1 }, { 6.2 - 5.5, -1.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -1.2 + 3, 0 }, { 6.2 - 5.5, -1.2 + 3, 1 }, { 6.5 - 5.5, -1.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.5 - 5.5, -1.4 + 3, 0 }, { 6.5 - 5.5, -1.4 + 3, 1 }, { 6.8 - 5.5, -1.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.8 - 5.5, -1.8 + 3, 0 }, { 6.8 - 5.5, -1.8 + 3, 1 }, { 7.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 7.0 - 5.5, -2.6 + 3, 0 }, { 7.0 - 5.5, -2.6 + 3, 1 }, { 7.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 7.0 - 5.5, -3.4 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 7.0 - 5.5, -3.4 + 3, 0 }, { 7.0 - 5.5, -3.4 + 3, 1 }, { 6.8 - 5.5, -4.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.8 - 5.5, -4.2 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.8 - 5.5, -4.2 + 3, 0 }, { 6.8 - 5.5, -4.2 + 3, 1 }, { 6.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.5 - 5.5, -4.6 + 3, 0 }, { 6.5 - 5.5, -4.6 + 3, 1 }, { 6.2 - 5.5, -4.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -4.8 + 3, 0 }, { 6.2 - 5.5, -4.8 + 3, 1 }, { 5.8 - 5.5, -5.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.8 - 5.5, -5.0 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.8 - 5.5, -5.0 + 3, 0 }, { 5.8 - 5.5, -5.0 + 3, 1 }, { 5.2 - 5.5, -5.0 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.2 - 5.5, -5.0 + 3, 0 }, { 5.2 - 5.5, -5.0 + 3, 1 }, { 4.8 - 5.5, -4.8 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -4.8 + 3, 0 }, { 4.8 - 5.5, -4.8 + 3, 1 }, { 4.5 - 5.5, -4.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.5 - 5.5, -4.6 + 3, 0 }, { 4.5 - 5.5, -4.6 + 3, 1 }, { 4.2 - 5.5, -4.2 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.2 - 5.5, -4.2 + 3, 0 }, { 4.2 - 5.5, -4.2 + 3, 1 }, { 4.0 - 5.5, -3.4 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 4.0 - 5.5, -3.4 + 3, 0 }, { 4.0 - 5.5, -3.4 + 3, 1 }, { 4.0 - 5.5, -2.6 + 3, 0 }, 0x0055 });
-		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.3 - 5.5, -1.8 + 3, 1 }, { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.7 - 5.5, -1.8 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.7 - 5.5, -1.8 + 3, 1 }, { 5.7 - 5.5, -1.8 + 3, 0 }, { 6.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.0 - 5.5, -2.0 + 3, 1 }, { 6.0 - 5.5, -2.0 + 3, 0 }, { 6.2 - 5.5, -2.4 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -2.4 + 3, 1 }, { 6.2 - 5.5, -2.4 + 3, 0 }, { 6.2 - 5.5, -3.6 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.2 - 5.5, -3.6 + 3, 1 }, { 6.2 - 5.5, -3.6 + 3, 0 }, { 6.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 6.0 - 5.5, -4.0 + 3, 1 }, { 6.0 - 5.5, -4.0 + 3, 0 }, { 5.7 - 5.5, -4.2 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.7 - 5.5, -4.2 + 3, 1 }, { 5.7 - 5.5, -4.2 + 3, 0 }, { 5.3 - 5.5, -4.2 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.3 - 5.5, -4.2 + 3, 1 }, { 5.3 - 5.5, -4.2 + 3, 0 }, { 5.0 - 5.5, -4.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.0 - 5.5, -4.0 + 3, 1 }, { 5.0 - 5.5, -4.0 + 3, 0 }, { 4.8 - 5.5, -3.6 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -3.6 + 3, 1 }, { 4.8 - 5.5, -3.6 + 3, 0 }, { 4.8 - 5.5, -2.4 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 4.8 - 5.5, -2.4 + 3, 1 }, { 4.8 - 5.5, -2.4 + 3, 0 }, { 5.0 - 5.5, -2.0 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 1 }, 0x0055 });
-		shape4.AddTriangle({ { 5.0 - 5.5, -2.0 + 3, 1 }, { 5.0 - 5.5, -2.0 + 3, 0 }, { 5.3 - 5.5, -1.8 + 3, 1 }, 0x0055 });
-		*/
-	}
-
-	void Update()
-	{
-		wchar_t print[128] = {};
-		int tempCounter = 0;
-
-		cmde::VEC3F slr = left * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
-		cmde::VEC3F slb = up * -sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
-		cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(left, sightLimitT), CrossProduct(up, slr), CrossProduct(slb, left) };
-		//cmde::VEC3F inBounds[] = { CrossProduct(sightLimitL, up), CrossProduct(up, slr) };
-		//Near and far planes too
-
-		//std::vector<Triangle> newTriangles = shape.triangles;
-		std::vector<Triangle> newTriangles = ClipTriangles(4, shape1.triangles, pos, inBounds);
-		std::vector<Triangle> addVector = ClipTriangles(4, shape2.triangles, pos, inBounds);
-		newTriangles.insert(newTriangles.end(), addVector.begin(), addVector.end());
-		addVector = ClipTriangles(4, shape3.triangles, pos, inBounds);
-		newTriangles.insert(newTriangles.end(), addVector.begin(), addVector.end());
-		addVector = ClipTriangles(4, shape4.triangles, pos, inBounds);
-		newTriangles.insert(newTriangles.end(), addVector.begin(), addVector.end());
-		addVector = ClipTriangles(4, shape5.triangles, pos, inBounds);
-		newTriangles.insert(newTriangles.end(), addVector.begin(), addVector.end());
-		for (Triangle t : newTriangles)
-		{
-			if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - pos) > 0)
-			{
-				//Backface culling (This isn't a TODO, skipping the triangle like this is the backface culling)
-				continue;
-			}
-			cmde::VEC3F vertices[3];
-			for (int i = 0; i < 3; i++)
-			{
-				if (myRenderingSystem == true)
-				{
-					DrawLine({ 0, 0 }, { 2, 0 });
-					DrawLine({ 0, 2 }, { 2, 2 });
-					DrawLine({ 0, 4 }, { 2, 4 });
-					Draw(0.0f, 1.0f);
-					Draw(2.0f, 3.0f);
-					cmde::VEC3F temp = t.vertices[i] - pos;
-					cmde::VEC3F hTemp = forwards * DotProduct(temp, forwards);
-					cmde::VEC3F vTemp = hTemp + up * DotProduct(temp, up);
-					hTemp = hTemp + left * DotProduct(temp, left);
-					float hAngle = Angle(hTemp, sightLimitL);
-					float vAngle = Angle(vTemp, sightLimitT);
-
-					/*
-					tempCounter = swprintf(print, 128, L"temp: (%f, %f, %f)", temp.x, temp.y, temp.z);
-					WriteText(0, 5, print, tempCounter);
-					tempCounter = swprintf(print, 128, L"hTemp: (%f, %f, %f)", hTemp.x, hTemp.y, hTemp.z);
-					WriteText(0, 6, print, tempCounter);
-					tempCounter = swprintf(print, 128, L"vTemp: (%f, %f, %f)", vTemp.x, vTemp.y, vTemp.z);
-					WriteText(0, 7, print, tempCounter);
-
-					tempCounter = swprintf(print, 128, L"(%f, %f, %f)", sightLimitL.x, sightLimitL.y, sightLimitL.z);
-					WriteText(0, 5, print, tempCounter);
-					tempCounter = swprintf(print, 128, L"%f°)", Angle(hTemp, sightLimitL));
-					WriteText(0, 6, print, tempCounter);
-					tempCounter = swprintf(print, 128, L"(%f, %f, %f)", hTemp.x, hTemp.y, hTemp.z);
-					WriteText(0, 7, print, tempCounter);
-					*/
-
-					vertices[i] = ScreenPosToPoint((hAngle / fov.x), (vAngle / fov.y));
-					vertices[i].z = (Magnitude(temp) - nearPlane) / (farPlane - nearPlane);
-				}
-				else
-				{
-					DrawLine({ 0, 0 }, { 2, 0 });
-					DrawLine({ 0, 2 }, { 2, 2 });
-					DrawLine({ 0, 0 }, { 0, 4 });
-					Draw(2.0f, 1.0f);
-					cmde::VEC3F temp = t.vertices[i] - pos;
-					temp = { DotProduct(temp, left), DotProduct(temp, up), DotProduct(temp, forwards) };
-					vertices[i] = (ProjectionMatrixify(temp, farPlane, nearPlane) + cmde::VEC2F(1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
-					vertices[i].z = (temp.z - nearPlane) / (farPlane - nearPlane);
-				}
-			}
-			if (wireframe == true)
-			{
-				short color = (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) < 0 ? 0x00EE : 0x00BB);
-				if (t.visibleSides[0] == true)
-					DrawLine(vertices[0], vertices[1], color, 0x2588, vertices[0].z, vertices[1].z);
-				if (t.visibleSides[1] == true)
-					DrawLine(vertices[1], vertices[2], color, 0x2588, vertices[1].z, vertices[2].z);
-				if (t.visibleSides[2] == true)
-					DrawLine(vertices[2], vertices[0], color, 0x2588, vertices[2].z, vertices[0].z);
-			}
-			else
-			{
-				/*
-				if (t.visibleSides[0] == true)
-					DrawLine(vertices[0], vertices[1], t.color, 0x2588, vertices[0].z, vertices[1].z);
-				if (t.visibleSides[1] == true)
-					DrawLine(vertices[1], vertices[2], t.color, 0x2588, vertices[1].z, vertices[2].z);
-				if (t.visibleSides[2] == true)
-					DrawLine(vertices[2], vertices[0], t.color, 0x2588, vertices[2].z, vertices[0].z);
-				*/
-				DrawTriangle(vertices[0], vertices[1], vertices[2], t.color, 0x2588, vertices[0].z, vertices[1].z, vertices[2].z);
-			}
-
-			//tempCounter = swprintf(print, 128, L"(%f, %f)", vertices[0].x, vertices[0].y);
-			//WriteText((vertices[0].x > 0 ? vertices[0].x : 0), vertices[0].y - 1, print, tempCounter);
-		}
-
-
-		pos = pos + forwards * (inputs[L'w'] >= 2 ? 0.05f : 0);
-		pos = pos + left * (inputs[L'a'] >= 2 ? 0.05f : 0);
-		pos = pos + forwards * (inputs[L's'] >= 2 ? -0.05f : 0);
-		pos = pos + left * (inputs[L'd'] >= 2 ? -0.05f : 0);
-		pos = pos + up * (inputs[L'q'] >= 2 ? -0.05f : 0);
-		pos = pos + up * (inputs[L'e'] >= 2 ? 0.05f : 0);
-		if (inputs[L'r'] == 2)
-		{
-			myRenderingSystem = !myRenderingSystem;
-		}
-
-		facing.x += (inputs[MOUSE_X] > 200 ? -0.4f : 0); // right
-		facing.x += (inputs[MOUSE_X] < 50 ? 0.4f : 0); // left
-		facing.y += (inputs[MOUSE_Y] > 200 ? -0.4f : 0); // bottom
-		facing.y += (inputs[MOUSE_Y] < 50 ? 0.4f : 0); // top
-
-		//X+ is left when Z+ is forwards and Y+ is up
-		forwards = VectorFromAngles(facing.x, facing.y);	//  0,  0,  1
-		left = VectorFromAngles(facing.x + 90, 0);			//  1,  0,  0
-		up = VectorFromAngles(facing.x, facing.y + 90);		//  0,  1,  0
-		sightLimitL = left * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
-		sightLimitT = up * sin(fov.x * 0.5f * RAD) + forwards * cos(fov.x * 0.5f * RAD);
-
-		/*
-		for (short i = 0; i < screenSize.Y; i++)
-		{
-			tempCounter = swprintf(print, 128, L"D: %f", zBuffer[i * screenSize.X + 10]);
-			WriteText(10, i, print, tempCounter);
-		}
-		tempCounter = swprintf(print, 128, L"X: %f | Y: %f | Z: %f", pos.x, pos.y, pos.z);
-		WriteText(0, 0, print, tempCounter);
-		tempCounter = swprintf(print, 128, L"H: %f | V: %f", facing.x, facing.y);
-		WriteText(0, 1, print, tempCounter);
-		tempCounter = swprintf(print, 128, L"forwards: (%f, %f, %f)", forwards.x, forwards.y, forwards.z);
-		WriteText(0, 2, print, tempCounter);
-		tempCounter = swprintf(print, 128, L"left: (%f, %f, %f)", left.x, left.y, left.z);
-		WriteText(0, 3, print, tempCounter);
-		tempCounter = swprintf(print, 128, L"up: (%f, %f, %f)", up.x, up.y, up.z);
-		WriteText(0, 4, print, tempCounter);
-
-		tempCounter = swprintf(print, 128, L"sll: (%f, %f, %f)", sightLimitL.x, sightLimitL.y, sightLimitL.z);
-		WriteText(0, 5, print, tempCounter);
-		cmde::VEC3F slr = forwards * DotProduct(sightLimitL, forwards) - left * DotProduct(sightLimitL, left);
-		tempCounter = swprintf(print, 128, L"slr: (%f, %f, %f)", slr.x, slr.y, slr.z);
-		WriteText(0, 6, print, tempCounter);
-		*/
-	}
-};
 
 class Test3D : public cmde::CMDEngine
 {
@@ -1978,7 +1519,7 @@ class Test3D : public cmde::CMDEngine
 		Mesh mesh;
 		cmde::VEC3F position;
 
-		Object(Mesh& m = *new Mesh(), cmde::VEC3F pos = {0, 0, 0})
+		Object(Mesh& m = *new Mesh(), cmde::VEC3F pos = { 0, 0, 0 })
 		{
 			mesh = m;
 			position = pos;
@@ -1987,6 +1528,7 @@ class Test3D : public cmde::CMDEngine
 
 	struct ObjFile : public cmde::PROCESSEDFILE
 	{
+		static const bool utf16 = false;
 		std::vector<cmde::VEC3F> points;
 		std::vector<Triangle> triangles;
 		wchar_t* ptr;
@@ -2000,7 +1542,7 @@ class Test3D : public cmde::CMDEngine
 			points = std::vector<cmde::VEC3F>();
 			triangles = std::vector<Triangle>();
 		}
-		
+
 		void ProcessLine(wchar_t* line, unsigned long length)
 		{
 			if (length > 1)
@@ -2079,6 +1621,111 @@ class Test3D : public cmde::CMDEngine
 		}
 	};
 
+	struct CMDE3DFile : public cmde::PROCESSEDFILE
+	{
+		static const int utf16 = false;
+		std::vector<Triangle> triangles;
+		wchar_t* ptr;
+		cmde::VEC3F tempVs[3];
+		short color;
+		CMDEngine* ce;
+
+		CMDE3DFile()
+		{
+			triangles = std::vector<Triangle>();
+		}
+
+		void ProcessLine(wchar_t* line, unsigned long length)
+		{
+			if (length > 1)
+			{
+				ptr = &line[0];
+				//(x1 y1 z1) ; (x2 y2 z2) ; (x3 y3 z3) #col
+				ptr++; //'('
+				tempVs[0].x = (float)std::wcstod(ptr, &ptr);
+				ptr++; //' '
+				tempVs[0].y = (float)std::wcstod(ptr, &ptr);
+				ptr++; //' '
+				tempVs[0].z = (float)std::wcstod(ptr, &ptr);
+				ptr++; //')'
+				ptr++; //' '
+				ptr++; //';'
+				ptr++; //' '
+				ptr++; //'('
+				tempVs[1].x = (float)std::wcstod(ptr, &ptr);
+				ptr++; //' '
+				tempVs[1].y = (float)std::wcstod(ptr, &ptr);
+				ptr++; //' '
+				tempVs[1].z = (float)std::wcstod(ptr, &ptr);
+				ptr++; //')'
+				ptr++; //' '
+				ptr++; //';'
+				ptr++; //' '
+				ptr++; //'('
+				tempVs[2].x = (float)std::wcstod(ptr, &ptr);
+				ptr++; //' '
+				tempVs[2].y = (float)std::wcstod(ptr, &ptr);
+				ptr++; //' '
+				tempVs[2].z = (float)std::wcstod(ptr, &ptr);
+				ptr++; //')'
+				ptr++; //' '
+				ptr++; //'#'
+				color = (short)std::wcstol(ptr, &ptr, 16);
+
+
+				triangles.push_back(Triangle(tempVs[0], tempVs[1], tempVs[2], color));
+			}
+		}
+
+		static bool Export(cmde::FILE& exportFile, Mesh mesh)
+		{
+			wchar_t lineBuffer[cmde::FILE::CHUNK_SIZE] = { 0 };
+			for (Triangle& t : mesh.triangles)
+			{
+				//UTF-8 Version
+				DWORD writeCount = swprintf(lineBuffer, cmde::FILE::CHUNK_SIZE,
+					L"(%c%011f %c%011f %c%011f) ; (%c%011f %c%011f %c%011f) ; (%c%011f %c%011f %c%011f) #0x%04hx\n",
+					(t.vertices[0].x < 0 ? L'-' : L'+'), abs(t.vertices[0].x),
+					(t.vertices[0].y < 0 ? L'-' : L'+'), abs(t.vertices[0].y),
+					(t.vertices[0].z < 0 ? L'-' : L'+'), abs(t.vertices[0].z),
+					(t.vertices[1].x < 0 ? L'-' : L'+'), abs(t.vertices[1].x),
+					(t.vertices[1].y < 0 ? L'-' : L'+'), abs(t.vertices[1].y),
+					(t.vertices[1].z < 0 ? L'-' : L'+'), abs(t.vertices[1].z),
+					(t.vertices[2].x < 0 ? L'-' : L'+'), abs(t.vertices[2].x),
+					(t.vertices[2].y < 0 ? L'-' : L'+'), abs(t.vertices[2].y),
+					(t.vertices[2].z < 0 ? L'-' : L'+'), abs(t.vertices[2].z),
+					t.color);
+				char byteBuffer[cmde::FILE::CHUNK_SIZE] = { 0 };
+				writeCount = WideCharToMultiByte(CP_UTF8, 0, lineBuffer, -1, byteBuffer, cmde::FILE::CHUNK_SIZE, NULL, NULL);
+				if (!WriteFile(exportFile.fileHandle, &byteBuffer, writeCount - 1, &writeCount, NULL))
+				{
+					return false;
+				}
+
+				//UTF-16 Version
+				/*
+				DWORD writeCount = swprintf(lineBuffer, cmde::FILE::CHUNK_SIZE,
+					L"(%c%011f %c%011f %c%011f) ; (%c%011f %c%011f %c%011f) ; (%c%011f %c%011f %c%011f) #0x%04hx\n",
+					(t.vertices[0].x < 0 ? L'-' : L'+'), abs(t.vertices[0].x),
+					(t.vertices[0].y < 0 ? L'-' : L'+'), abs(t.vertices[0].y),
+					(t.vertices[0].z < 0 ? L'-' : L'+'), abs(t.vertices[0].z),
+					(t.vertices[1].x < 0 ? L'-' : L'+'), abs(t.vertices[1].x),
+					(t.vertices[1].y < 0 ? L'-' : L'+'), abs(t.vertices[1].y),
+					(t.vertices[1].z < 0 ? L'-' : L'+'), abs(t.vertices[1].z),
+					(t.vertices[2].x < 0 ? L'-' : L'+'), abs(t.vertices[2].x),
+					(t.vertices[2].y < 0 ? L'-' : L'+'), abs(t.vertices[2].y),
+					(t.vertices[2].z < 0 ? L'-' : L'+'), abs(t.vertices[2].z),
+					t.color);
+				if (!WriteFile(exportFile.fileHandle, &lineBuffer, writeCount * 2, &writeCount, NULL))
+				{
+					return false;
+				}
+				*/
+			}
+			return true;
+		}
+	};
+
 	struct RaycastHit
 	{
 		PLANE plane;
@@ -2089,12 +1736,12 @@ class Test3D : public cmde::CMDEngine
 
 		RaycastHit(PLANE p, Object* o, Triangle* t) { plane = p; object = o; triangle = t; }
 
-		/// <summary>
-		/// Casts a ray and detects the first plane of the objects with which it intersects
-		/// </summary>
-		/// <param name="origin">The point from ray starts at</param>
-		/// <param name="direction">The direction the ray goes</param>
-		/// <param name="objects">The objects to test against</param>
+						/// <summary>
+						/// Casts a ray and detects the first plane of the objects with which it intersects
+						/// </summary>
+						/// <param name="origin">The point from ray starts at</param>
+						/// <param name="direction">The direction the ray goes</param>
+						/// <param name="objects">The objects to test against</param>
 		bool Raycast(cmde::VEC3F origin, cmde::VEC3F direction, std::vector<Object>& objects)
 		{
 			std::vector<RaycastHit> hits = std::vector<RaycastHit>();
@@ -2282,21 +1929,21 @@ class Test3D : public cmde::CMDEngine
 
 	static bool RayPlaneIntersection(PLANE plane, cmde::VEC3F origin, cmde::VEC3F direction, cmde::VEC3F* output)
 	{
-			float nd = DotProduct(plane.normal, direction);
-			if (nd == 0)
-				return false;
-			float t = (DotProduct(plane.normal, plane.point - origin) / nd);
-			if (t < 0)
-				return false;
-			*output = origin + direction * t;
-			return true;
+		float nd = DotProduct(plane.normal, direction);
+		if (nd == 0)
+			return false;
+		float t = (DotProduct(plane.normal, plane.point - origin) / nd);
+		if (t < 0)
+			return false;
+		*output = origin + direction * t;
+		return true;
 	}
 
 	static bool PointInTriangle(cmde::VEC3F point, Triangle& triangle)
 	{
 		return (DotProduct(point - triangle.vertices[0], CrossProduct(triangle.vertices[2] - triangle.vertices[0], triangle.normal)) < 0) &&
-			   (DotProduct(point - triangle.vertices[1], CrossProduct(triangle.vertices[0] - triangle.vertices[1], triangle.normal)) < 0) &&
-			   (DotProduct(point - triangle.vertices[2], CrossProduct(triangle.vertices[1] - triangle.vertices[2], triangle.normal)) < 0);
+			(DotProduct(point - triangle.vertices[1], CrossProduct(triangle.vertices[0] - triangle.vertices[1], triangle.normal)) < 0) &&
+			(DotProduct(point - triangle.vertices[2], CrossProduct(triangle.vertices[1] - triangle.vertices[2], triangle.normal)) < 0);
 	}
 
 	static std::vector<Triangle> ClipTriangles(Object& obj, cmde::VEC3F cameraPos, PLANE inBounds[6])
@@ -2386,18 +2033,18 @@ class Test3D : public cmde::CMDEngine
 		return output;
 	}
 
-					///<summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one<\summary>
+					///<summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one</summary>
 	float DepthConversion(float depth) { return (depth * camera.farPlane) / (depth * (camera.farPlane - camera.nearPlane) + camera.nearPlane); }
 					///<summary>Takes a relative depth value where 0 is the near plane and 1 is the far plane, and returns an actual depth value</summary>
 	float DenormalizeDepth(float depth) { return depth * (camera.farPlane - camera.nearPlane) + camera.nearPlane; }
 
-	/// <summary>
-	/// Casts a ray and detects every plane of the objects with which it intersects
-	/// </summary>
-	/// <param name="origin">The point from ray starts at</param>
-	/// <param name="direction">The direction the ray goes</param>
-	/// <param name="objects">The objects to test against</param>
-	/// <param name="output">The vector in which to store the data of every hit</param>
+					/// <summary>
+					/// Casts a ray and detects every plane of the objects with which it intersects
+					/// </summary>
+					/// <param name="origin">The point from ray starts at</param>
+					/// <param name="direction">The direction the ray goes</param>
+					/// <param name="objects">The objects to test against</param>
+					/// <param name="output">The vector in which to store the data of every hit</param>
 	static bool RaycastAll(cmde::VEC3F origin, cmde::VEC3F direction, std::vector<Object>& objects, std::vector<RaycastHit>* output)
 	{
 		direction = Normalize(direction);
@@ -2448,7 +2095,7 @@ public:
 	{
 		//1x1x1 Cube
 		///*
-		Mesh cube1 = Mesh(*new std::vector<Triangle> {
+		Mesh cube1 = Mesh(*new std::vector<Triangle>{
 			{ { 0, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, 0x00AA },
 			{ { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 }, 0x00AA },
 			{ { 0, 0, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, 0x00AA },
@@ -2461,7 +2108,7 @@ public:
 			{ { 0, 0, 0 }, { 0, 1, 1 }, { 0, 1, 0 }, 0x00AA },
 			{ { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, 0x00AA },
 			{ { 0, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 }, 0x00AA }
-		});
+			});
 		//*/
 
 		//2x2x2 Cube (With Z+2 offset)
@@ -2710,12 +2357,12 @@ public:
 		*/
 
 		obj1 = Object(cube1, cmde::VEC3F(0, 0, 0));
-		obj1.mesh.ChangeColor(0x00AE);
+		obj1.mesh.ChangeColor(0x00AA);
 		objects.push_back(obj1);
 		obj2 = Object(cube1, cmde::VEC3F(0, 1, 0));
-		obj2.mesh.ChangeColor(0x00BF);
+		obj2.mesh.ChangeColor(0x00BB);
 		objects.push_back(obj2);
-		defaultRaycast = *new Mesh(*new std::vector<Triangle> { { { 0.1f, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0.1f, 0 }, 0x0003 }, { { 0, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0, 0 }, 0x0003 }});
+		defaultRaycast = *new Mesh(*new std::vector<Triangle>{ { { 0.1f, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0.1f, 0 }, 0x0003 }, { { 0, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0, 0 }, 0x0003 } });
 		obj3 = Object(defaultRaycast, { 0, 0, 0 });
 		objects.push_back(obj3);
 		shape4 = Mesh();
@@ -2735,7 +2382,7 @@ public:
 
 	void Setup()
 	{
-		
+
 	}
 
 	void Update()
@@ -2804,11 +2451,31 @@ public:
 		if (inputs[L'f'] == 2)
 		{
 			cmde::FILE file;
-			if (PromptFileSearch(&file, L"OBJ", L"*.obj"))
+			if (PromptFileSearch(&file, L"OBJ", L"*.obj;*.3D.cmde"))
 			{
-				ObjFile output = ObjFile();
-				file.ProcessFile<ObjFile>(&output);
-				objects.at(1).mesh = Mesh(output.triangles);
+				if (file.HasExtension(L"obj"))
+				{
+					ObjFile output = ObjFile();
+					file.ProcessFile<ObjFile>(&output);
+					objects.at(1).mesh = Mesh(output.triangles);
+				}
+				else
+				{
+					if (file.HasExtension(L"3D.cmde"))
+					{
+						CMDE3DFile output = CMDE3DFile();
+						file.ProcessFile<CMDE3DFile>(&output);
+						objects.at(1).mesh = Mesh(output.triangles);
+					}
+				}
+			}
+		}
+		if (inputs[L'g'] == 2)
+		{
+			cmde::FILE file;
+			if (PromptFileSave(&file, L"CMDE 3D", L"*.3D.cmde"))
+			{
+				CMDE3DFile::Export(file, objects.at(1).mesh);
 			}
 		}
 
