@@ -1,2 +1,3 @@
 ﻿  code.cpp
+C:\Users\tatoy\source\repos\Engine\code.cpp(2475,17): warning C4244: 'initializing': conversion from 'float' to 'short', possible loss of data
   Engine.vcxproj -> C:\Users\tatoy\source\repos\Engine\x64\Debug\Engine.exe

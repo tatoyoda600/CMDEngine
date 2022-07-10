@@ -186,7 +186,6 @@ namespace cmde
 			wchar_t lineBuffer[CHUNK_SIZE] = { 0 };
 			unsigned long lineBufferPos = 0; //The position in lineBuffer where the last line stopped
 			DWORD readCount = 0;
-			OVERLAPPED filePosition{};
 
 			long tempHigh = fileSize.HighPart;
 			unsigned long tempLow = fileSize.LowPart;
@@ -202,8 +201,6 @@ namespace cmde
 					//There are CHUNK_SIZE bytes remaining
 
 					//Reads CHUNK_SIZE at a time
-					filePosition.OffsetHigh = fileSize.HighPart - tempHigh;
-					filePosition.Offset = counter;
 					if (ReadFile(fileHandle, &buffer, CHUNK_SIZE, &readCount, NULL))
 					{
 						if (!output->utf16)
@@ -296,8 +293,6 @@ namespace cmde
 				}
 			}
 			//tempLow bytes remain unread in the file (Less than CHUNK_SIZE)
-			filePosition.OffsetHigh = fileSize.HighPart - tempHigh;
-			filePosition.Offset = counter;
 			if (ReadFile(fileHandle, &buffer, tempLow, &readCount, NULL))
 			{
 				if (!output->utf16)
@@ -631,13 +626,15 @@ namespace cmde
 						/// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
 		void Draw(short x, short y, short col = 0x000F, short cha = 0x2588, float depth = -1)
 		{
-			if (OnScreen(x, y) && (depth < 0 || (depth >= 0 && depth < zBuffer[y * screenSize.X + x])))
+			if (OnScreen(x, y) && depth < zBuffer[y * screenSize.X + x])
 			{
 				screen[y * screenSize.X + x].Char.UnicodeChar = cha;
 				screen[y * screenSize.X + x].Attributes = col;
 				zBuffer[y * screenSize.X + x] = depth;
 			}
 		}
+						/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="x">The x position of the point (Leftmost is 0; Rightmost is screenSize.X)</param> /// <param name="y">The y position of the point (Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
+		void Draw(int x, int y, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)x, (short)y, col, cha, depth); }
 		//Due to issues with numbers between 0-1 when casting, '(short)((short)(x + 2) - 2)' is needed, since numbers between 2-3 convert correctly
 						/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="x">The x position of the point (Leftmost is 0; Rightmost is screenSize.X)</param> /// <param name="y">The y position of the point (Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
 		void Draw(float x, float y, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)((short)(x + 2) - 2), (short)((short)(y + 2) - 2), col, cha, depth); }
@@ -732,11 +729,11 @@ namespace cmde
 						/// <param name="length">The amount of characters in the text</param>
 						/// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param>
 						/// <param name="depth">How far away from the camera the text is (For rendering things on top of each other) (Negative values are always drawn)</param>
-		void WriteText(short x, short y, wchar_t* text, int length, short col = 0x000F, float depth = -1)
+		void WriteText(short x, short y, wchar_t* text, short length, short col = 0x000F, float depth = -1)
 		{
-			for (int i = 0; i < length; i++)
+			for (short i = 0; i < length; i++)
 			{
-				Draw(i + x, (short)y, col, text[i], depth);
+				Draw((short)(i + x), y, col, text[i], depth);
 			}
 		}
 
@@ -2078,17 +2075,18 @@ public:
 	Object obj1;
 	Object obj2;
 	Object obj3;
-	Mesh shape4;
-	Mesh shape5;
 	Camera camera;
 	bool myRenderingSystem;
 	bool wireframe;
 	std::vector<COORD> postProcessBuffer = {}; //TODO, MAYBE
 	std::vector<Object> objects = {};
+	short selCol = 0x0000;
 
+	/*
 	Mesh defaultRaycast;
 	Triangle* resetTriangleColor = new Triangle(cmde::VEC3F(), cmde::VEC3F(), cmde::VEC3F());
 	short resetColor = 0x0FF1;
+	*/
 
 
 	Test3D(short screenWidth, short screenHeight, short fontWidth, short fontHeight) : cmde::CMDEngine(screenWidth, screenHeight, fontWidth, fontHeight, true, true, FPS60)
@@ -2362,11 +2360,9 @@ public:
 		obj2 = Object(cube1, cmde::VEC3F(0, 1, 0));
 		obj2.mesh.ChangeColor(0x00BB);
 		objects.push_back(obj2);
-		defaultRaycast = *new Mesh(*new std::vector<Triangle>{ { { 0.1f, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0.1f, 0 }, 0x0003 }, { { 0, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0, 0 }, 0x0003 } });
-		obj3 = Object(defaultRaycast, { 0, 0, 0 });
-		objects.push_back(obj3);
-		shape4 = Mesh();
-		shape5 = Mesh();
+		//defaultRaycast = *new Mesh(*new std::vector<Triangle>{ { { 0.1f, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0.1f, 0 }, 0x0003 }, { { 0, 0, 0 }, { 0, 0.1f, 0 }, { 0.1f, 0, 0 }, 0x0003 } });
+		//obj3 = Object(defaultRaycast, { 0, 0, 0 });
+		//objects.push_back(obj3);
 		myRenderingSystem = false;
 		wireframe = false;
 		emptyChar.Attributes = 0x0088;
@@ -2393,6 +2389,7 @@ public:
 		camera.UpdateInBounds();
 
 		//Raycast crosshair
+		/*
 		if (resetColor != 0x0FF1)
 		{
 			resetTriangleColor->color = resetColor;
@@ -2418,36 +2415,103 @@ public:
 			tempTriangles.push_back(Triangle(tempV1 * 0.1f, tempV1 * -1 * 0.1f, tempV2 * -1 * 0.1f, 0x0003).GetWithOffset(hit.plane.point + camera.forwards * -0.1f));
 		}
 		objects.at(2).mesh = Mesh(tempTriangles);
+		*/
 
 		//Move object
 		objects.at(0).position = objects.at(0).position + cmde::VEC3F(0.1f, 0, 0) * deltaTime;
 
 		if (myRenderingSystem == true)
 		{
-			camera.RenderShapeSpherical(objects.at(0), wireframe);
-			camera.RenderShapeSpherical(objects.at(1), wireframe);
-			camera.RenderShapeSpherical(objects.at(2), wireframe);
+			for (Object& o : objects)
+			{
+				camera.RenderShapeSpherical(o, wireframe);
+			}
 		}
 		else
 		{
-			camera.RenderShapeProjection(objects.at(0), wireframe);
-			camera.RenderShapeProjection(objects.at(1), wireframe);
-			camera.RenderShapeProjection(objects.at(2), wireframe);
+			for (Object& o : objects)
+			{
+				camera.RenderShapeProjection(o, wireframe);
+			}
 		}
 
 		DrawLineS(cmde::VEC2F(0.495f, 0.5f), cmde::VEC2F(0.51f, 0.5f), 0x00FF);
 		DrawLineS(cmde::VEC2F(0.5f, 0.495f), cmde::VEC2F(0.5f, 0.51f), 0x00FF);
 
+		Inputs();
+		DrawPallet(3, 0, 25, 10);
+
+		camera.UpdateRotation();
+
+		//Debug UI
+		/*
+		for (short i = 0; i < screenSize.Y; i++)
+		{
+			printLength = swprintf(print, 128, L"D: %f", zBuffer[i * screenSize.X + 10]);
+			WriteText(10, i, print, printLength);
+		}
+		printLength = swprintf(print, 128, L"X: %f | Y: %f | Z: %f", camera.position.x, camera.position.y, camera.position.z);
+		WriteText(0, 0, print, printLength);
+		printLength = swprintf(print, 128, L"H: %f | V: %f", camera.facing.x, camera.facing.y);
+		WriteText(0, 1, print, printLength);
+		printLength = swprintf(print, 128, L"forwards: (%f, %f, %f)", camera.forwards.x, camera.forwards.y, camera.forwards.z);
+		WriteText(0, 2, print, printLength);
+		printLength = swprintf(print, 128, L"left: (%f, %f, %f)", camera.left.x, camera.left.y, camera.left.z);
+		WriteText(0, 3, print, printLength);
+		printLength = swprintf(print, 128, L"up: (%f, %f, %f)", camera.up.x, camera.up.y, camera.up.z);
+		WriteText(0, 4, print, printLength);
+
+		printLength = swprintf(print, 128, L"sll: (%f, %f, %f)", camera.sightLimitL.x, camera.sightLimitL.y, camera.sightLimitL.z);
+		WriteText(0, 5, print, printLength);
+		cmde::VEC3F slr = camera.forwards * DotProduct(camera.sightLimitL, camera.forwards) - camera.left * DotProduct(camera.sightLimitL, camera.left);
+		printLength = swprintf(print, 128, L"slr: (%f, %f, %f)", slr.x, slr.y, slr.z);
+		WriteText(0, 6, print, printLength);
+		*/
+	}
+
+	void DrawPallet(short topLeftX, short topLeftY, short bottomRightX, short bottomRightY)
+	{
+		short sizeX = bottomRightX - topLeftX - 1;
+		short offsetX = ceilf(sizeX * 0.20f);
+		sizeX -= 2 * offsetX;
+		short sizeY = bottomRightY - topLeftY - 1;
+		DrawLine(topLeftX, topLeftY, bottomRightX, topLeftY, 0x0000, 0x2588, -1, -1);
+		DrawLine(topLeftX, topLeftY, topLeftX, bottomRightY, 0x0000, 0x2588, -1, -1);
+		DrawLine(bottomRightX, topLeftY, bottomRightX, bottomRightY, 0x0000, 0x2588, -1, -1);
+		DrawLine(topLeftX, bottomRightY, bottomRightX, bottomRightY, 0x0000, 0x2588, -1, -1);
+		for (short i = 0; i < sizeX; i++)
+		{
+			for (short j = 0; j < sizeY; j++)
+			{
+				Draw(topLeftX + 1 + 0			+ i,	topLeftY + 1 + j, 0x0080 + (selCol + 15) % 16,	0x2592);
+				Draw(topLeftX + 1 + offsetX		+ i,	topLeftY + 1 + j, selCol * 17,					0x2588, -2);
+				Draw(topLeftX + 1 + 2 * offsetX + i,	topLeftY + 1 + j, 0x0080 + (selCol + 1) % 16,	0x2592);
+			}
+		}
+	}
+	void Inputs()
+	{
+		//Moving
 		camera.position = camera.position + camera.forwards * (inputs[L'w'] >= 2 ? 0.05f : 0);
 		camera.position = camera.position + camera.left * (inputs[L'a'] >= 2 ? 0.05f : 0);
 		camera.position = camera.position + camera.forwards * (inputs[L's'] >= 2 ? -0.05f : 0);
 		camera.position = camera.position + camera.left * (inputs[L'd'] >= 2 ? -0.05f : 0);
 		camera.position = camera.position + camera.up * (inputs[L'q'] >= 2 ? -0.05f : 0);
 		camera.position = camera.position + camera.up * (inputs[L'e'] >= 2 ? 0.05f : 0);
+
+		//Looking
+		camera.facing.x += (inputs[MOUSE_X] > 200 ? -0.4f : 0); // right
+		camera.facing.x += (inputs[MOUSE_X] < 50 ? 0.4f : 0); // left
+		camera.facing.y += (inputs[MOUSE_Y] > 200 ? -0.4f : 0); // bottom
+		camera.facing.y += (inputs[MOUSE_Y] < 50 ? 0.4f : 0); // top
+
+		//Rendering
 		if (inputs[L'r'] == 2)
 		{
 			myRenderingSystem = !myRenderingSystem;
 		}
+
+		//Importing/Exporting
 		if (inputs[L'f'] == 2)
 		{
 			cmde::FILE file;
@@ -2479,37 +2543,17 @@ public:
 			}
 		}
 
-		camera.facing.x += (inputs[MOUSE_X] > 200 ? -0.4f : 0); // right
-		camera.facing.x += (inputs[MOUSE_X] < 50 ? 0.4f : 0); // left
-		camera.facing.y += (inputs[MOUSE_Y] > 200 ? -0.4f : 0); // bottom
-		camera.facing.y += (inputs[MOUSE_Y] < 50 ? 0.4f : 0); // top
-
-		camera.UpdateRotation();
-
-		//Debug UI
-		/*
-		for (short i = 0; i < screenSize.Y; i++)
+		//Painting
+		selCol = ((inputs[L'.'] == 2 ? selCol + 1 : (inputs[L','] == 2 ? selCol - 1 : selCol)) + 16) % 16;
+		if (inputs[L'c'] >= 2)
 		{
-			printLength = swprintf(print, 128, L"D: %f", zBuffer[i * screenSize.X + 10]);
-			WriteText(10, i, print, printLength);
+			RaycastHit hit;
+			std::vector<Triangle> tempTriangles = std::vector<Triangle>();
+			if (hit.Raycast(camera.position, camera.forwards, objects))
+			{
+				hit.triangle->color = selCol;
+			}
 		}
-		printLength = swprintf(print, 128, L"X: %f | Y: %f | Z: %f", camera.position.x, camera.position.y, camera.position.z);
-		WriteText(0, 0, print, printLength);
-		printLength = swprintf(print, 128, L"H: %f | V: %f", camera.facing.x, camera.facing.y);
-		WriteText(0, 1, print, printLength);
-		printLength = swprintf(print, 128, L"forwards: (%f, %f, %f)", camera.forwards.x, camera.forwards.y, camera.forwards.z);
-		WriteText(0, 2, print, printLength);
-		printLength = swprintf(print, 128, L"left: (%f, %f, %f)", camera.left.x, camera.left.y, camera.left.z);
-		WriteText(0, 3, print, printLength);
-		printLength = swprintf(print, 128, L"up: (%f, %f, %f)", camera.up.x, camera.up.y, camera.up.z);
-		WriteText(0, 4, print, printLength);
-
-		printLength = swprintf(print, 128, L"sll: (%f, %f, %f)", camera.sightLimitL.x, camera.sightLimitL.y, camera.sightLimitL.z);
-		WriteText(0, 5, print, printLength);
-		cmde::VEC3F slr = camera.forwards * DotProduct(camera.sightLimitL, camera.forwards) - camera.left * DotProduct(camera.sightLimitL, camera.left);
-		printLength = swprintf(print, 128, L"slr: (%f, %f, %f)", slr.x, slr.y, slr.z);
-		WriteText(0, 6, print, printLength);
-		*/
 	}
 };
 
