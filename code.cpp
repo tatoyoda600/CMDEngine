@@ -179,7 +179,7 @@ namespace cmde
 		bool ProcessFile(T* output)
 		{
 			LARGE_INTEGER fileSize = { 0 };
-			if (GetFileSizeEx(fileHandle, &fileSize) == false)
+			if (!GetFileSizeEx(fileHandle, &fileSize))
 				return false;
 
 			byte buffer[CHUNK_SIZE] = { 0 };
@@ -631,7 +631,7 @@ namespace cmde
 				screen[y * screenSize.X + x].Char.UnicodeChar = cha;
 				screen[y * screenSize.X + x].Attributes = col;
 				zBuffer[y * screenSize.X + x] = depth;
-			}
+			};
 		}
 						/// <summary>Draws to a specific point on the command prompt</summary> /// <param name="x">The x position of the point (Leftmost is 0; Rightmost is screenSize.X)</param> /// <param name="y">The y position of the point (Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param>
 		void Draw(int x, int y, short col = 0x000F, short cha = 0x2588, float depth = -1) { Draw((short)x, (short)y, col, cha, depth); }
@@ -1060,7 +1060,7 @@ namespace cmde
 						continue;
 					}
 
-					k->second = (buf.Event.KeyEvent.bKeyDown == false ? 1 : (k->second <= 1 ? 2 : 3));
+					k->second = (!buf.Event.KeyEvent.bKeyDown ? 1 : (k->second <= 1 ? 2 : 3));
 
 					if (buf.Event.KeyEvent.dwControlKeyState > 0)
 					{
@@ -1553,19 +1553,19 @@ class Test3D : public cmde::CMDEngine
 					{
 						return;
 					}
-					while (isdigit(*ptr) == false && *ptr != L'-')
+					while (!isdigit(*ptr) && *ptr != L'-')
 					{
 						ptr++;
 					}
 					tempV.x = (float)std::wcstod(ptr, &ptr);
 
-					while (isdigit(*ptr) == false && *ptr != L'-')
+					while (!isdigit(*ptr) && *ptr != L'-')
 					{
 						ptr++;
 					}
 					tempV.y = (float)std::wcstod(ptr, &ptr);
 
-					while (isdigit(*ptr) == false && *ptr != L'-')
+					while (!isdigit(*ptr) && *ptr != L'-')
 					{
 						ptr++;
 					}
@@ -1587,7 +1587,7 @@ class Test3D : public cmde::CMDEngine
 					index = 0;
 					while (ptr < &line[length - 1])
 					{
-						while (isdigit(*ptr) == false && *ptr != L'-' && ptr < &line[length - 1])
+						while (!isdigit(*ptr) && *ptr != L'-' && ptr < &line[length - 1])
 						{
 							ptr++;
 						}
@@ -1775,6 +1775,7 @@ class Test3D : public cmde::CMDEngine
 		PLANE* inBounds;
 		COORD screenSize;
 		CMDEngine* engine;
+		float divideFarMinusNear;
 
 						///<summary>There must be a default constructor or computer gets mad (This should be unusable though)</summary>
 		Camera()
@@ -1788,16 +1789,12 @@ class Test3D : public cmde::CMDEngine
 		Camera(cmde::VEC3F position, cmde::VEC2F facing, cmde::VEC2F fov, float nearPlane, float farPlane, CMDEngine* engine)
 		{
 			this->position = position;
-			this->left = left;
-			this->forwards = forwards;
-			this->up = up;
-			this->sightLimitL = sightLimitL;
-			this->sightLimitT = sightLimitT;
 			this->fov = fov;
 			this->nearPlane = nearPlane;
 			this->farPlane = farPlane;
 			this->screenSize = engine->screenSize;
 			this->engine = engine;
+			this->divideFarMinusNear = 1 / (farPlane - nearPlane);
 			UpdateInBounds();
 			UpdateRotation();
 		}
@@ -1823,11 +1820,6 @@ class Test3D : public cmde::CMDEngine
 				cmde::VEC3F vertices[3];
 				for (int i = 0; i < 3; i++)
 				{
-					engine->DrawLine({ 0, 0 }, { 2, 0 });
-					engine->DrawLine({ 0, 2 }, { 2, 2 });
-					engine->DrawLine({ 0, 4 }, { 2, 4 });
-					engine->Draw(0.0f, 1.0f);
-					engine->Draw(2.0f, 3.0f);
 					cmde::VEC3F temp = t.vertices[i] - position;
 					cmde::VEC3F hTemp = forwards * DotProduct(temp, forwards);
 					cmde::VEC3F vTemp = hTemp + up * DotProduct(temp, up);
@@ -1836,16 +1828,16 @@ class Test3D : public cmde::CMDEngine
 					float vAngle = Angle(vTemp, sightLimitT);
 
 					vertices[i] = engine->ScreenPosToPoint((hAngle / fov.x), (vAngle / fov.y));
-					vertices[i].z = (Magnitude(temp) - nearPlane) / (farPlane - nearPlane);
+					vertices[i].z = (Magnitude(temp) - nearPlane) * divideFarMinusNear;
 				}
-				if (wireframe == true)
+				if (wireframe)
 				{
 					short color = (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) < 0 ? 0x00EE : 0x00BB);
-					if (t.visibleSides[0] == true)
+					if (t.visibleSides[0])
 						engine->DrawLine(vertices[0], vertices[1], color, 0x2588, vertices[0].z, vertices[1].z);
-					if (t.visibleSides[1] == true)
+					if (t.visibleSides[1])
 						engine->DrawLine(vertices[1], vertices[2], color, 0x2588, vertices[1].z, vertices[2].z);
-					if (t.visibleSides[2] == true)
+					if (t.visibleSides[2])
 						engine->DrawLine(vertices[2], vertices[0], color, 0x2588, vertices[2].z, vertices[0].z);
 				}
 				else
@@ -1853,39 +1845,42 @@ class Test3D : public cmde::CMDEngine
 					engine->DrawTriangle(vertices[0], vertices[1], vertices[2], t.color, 0x2588, vertices[0].z, vertices[1].z, vertices[2].z);
 				}
 			}
+			engine->DrawLine({ 0, 0 }, { 2, 0 });
+			engine->DrawLine({ 0, 2 }, { 2, 2 });
+			engine->DrawLine({ 0, 4 }, { 2, 4 });
+			engine->Draw(0.0f, 1.0f);
+			engine->Draw(2.0f, 3.0f);
 		}
 
 		void RenderShapeProjection(Object& obj, bool wireframe = false)
 		{
+
 			UpdateInBounds();
 			std::vector<Triangle> newTriangles = ClipTriangles(obj, position, inBounds);
-			for (Triangle t : newTriangles)
+			cmde::VEC3F temp;
+			cmde::VEC3F vertices[3];
+			for (Triangle &t : newTriangles)
 			{
 				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - position) >= 0)
 				{
 					//Backface culling (This isn't a TODO, skipping the triangle like this is the backface culling)
 					continue;
 				}
-				cmde::VEC3F vertices[3];
 				for (int i = 0; i < 3; i++)
 				{
-					engine->DrawLine({ 0, 0 }, { 2, 0 });
-					engine->DrawLine({ 0, 2 }, { 2, 2 });
-					engine->DrawLine({ 0, 0 }, { 0, 4 });
-					engine->Draw(2.0f, 1.0f);
-					cmde::VEC3F temp = t.vertices[i] - position;
+					temp = t.vertices[i] - position;
 					temp = { DotProduct(temp, left), DotProduct(temp, up), DotProduct(temp, forwards) };
 					vertices[i] = (ProjectionMatrixify(temp) + cmde::VEC2F(1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
-					vertices[i].z = (temp.z - nearPlane) / (farPlane - nearPlane);
+					vertices[i].z = (temp.z - nearPlane) * divideFarMinusNear;
 				}
-				if (wireframe == true)
+				if (wireframe)
 				{
 					short color = (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), forwards) < 0 ? 0x00EE : 0x00BB);
-					if (t.visibleSides[0] == true)
+					if (t.visibleSides[0])
 						engine->DrawLine(vertices[0], vertices[1], color, 0x2588, vertices[0].z, vertices[1].z);
-					if (t.visibleSides[1] == true)
+					if (t.visibleSides[1])
 						engine->DrawLine(vertices[1], vertices[2], color, 0x2588, vertices[1].z, vertices[2].z);
-					if (t.visibleSides[2] == true)
+					if (t.visibleSides[2])
 						engine->DrawLine(vertices[2], vertices[0], color, 0x2588, vertices[2].z, vertices[0].z);
 				}
 				else
@@ -1893,6 +1888,10 @@ class Test3D : public cmde::CMDEngine
 					engine->DrawTriangle(vertices[0], vertices[1], vertices[2], t.color, 0x2588, vertices[0].z, vertices[1].z, vertices[2].z);
 				}
 			}
+			engine->DrawLine({ 0, 0 }, { 2, 0 });
+			engine->DrawLine({ 0, 2 }, { 2, 2 });
+			engine->DrawLine({ 0, 0 }, { 0, 4 });
+			engine->Draw(2.0f, 1.0f);
 		}
 
 		void UpdateRotation()
@@ -1956,23 +1955,22 @@ class Test3D : public cmde::CMDEngine
 
 	static void ClipTriangles(std::vector<Triangle>* ts, cmde::VEC3F cameraPos, PLANE inBounds[6])
 	{
+		std::vector<Triangle> temp;
 		for (short i = 0; i < 6; i++)
 		{
-			std::vector<Triangle> temp;
+			temp = std::vector<Triangle>();
 			for (Triangle& t : *ts)
 			{
-				std::vector<Triangle> ct = ClipTriangle(t, inBounds[i]);
-				temp.insert(temp.end(), ct.begin(), ct.end());
+				ClipTriangle(t, inBounds[i], &temp);
 			}
 			*ts = temp;
 		}
 	}
 
-	static std::vector<Triangle> ClipTriangle(Triangle& t, PLANE inBounds)
+	static void ClipTriangle(Triangle& t, PLANE inBounds, std::vector<Triangle>* output)
 	{
 		bool oob[3] = { false };
 		short c = 0;
-		std::vector<Triangle> output = std::vector<Triangle>();
 		for (short i = 0; i < 3; i++)
 		{
 			if (DotProduct(t.vertices[i] - inBounds.point, inBounds.normal) < 0)
@@ -1999,7 +1997,7 @@ class Test3D : public cmde::CMDEngine
 		short o = 0;
 		for (short i = 0; i < 3; i++)
 		{
-			if (oob[i] == true)
+			if (oob[i])
 			{
 				o = i;
 				g = t.vertices[i];
@@ -2014,20 +2012,19 @@ class Test3D : public cmde::CMDEngine
 		switch (c)
 		{
 		case 0:
-			output.push_back(Triangle(t));
+			output->push_back(Triangle(t));
 			break;
 		case 3:
 			//nothing
 			break;
 		case 1:
-			output.push_back(Triangle(new1, g1, g2, t.color, true && t.visibleSides[o], true && t.visibleSides[(o + 1) % 3], false));
-			output.push_back(Triangle(new1, g2, new2, t.color, false, true && t.visibleSides[(o + 2) % 3], false));
+			output->push_back(Triangle(new1, g1, g2, t.color, true && t.visibleSides[o], true && t.visibleSides[(o + 1) % 3], false));
+			output->push_back(Triangle(new1, g2, new2, t.color, false, true && t.visibleSides[(o + 2) % 3], false));
 			break;
 		case 2:
-			output.push_back(Triangle(g, new1, new2, t.color, true && t.visibleSides[o], false, true && t.visibleSides[(o + 2) % 3]));
+			output->push_back(Triangle(g, new1, new2, t.color, true && t.visibleSides[o], false, true && t.visibleSides[(o + 2) % 3]));
 			break;
 		}
-		return output;
 	}
 
 					///<summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one</summary>
@@ -2057,12 +2054,9 @@ class Test3D : public cmde::CMDEngine
 					{
 						Triangle tOff = t.GetWithOffset(o.position);
 						cmde::VEC3F point = cmde::VEC3F();
-						if (RayPlaneIntersection(PLANE(tOff.vertices[0], tOff.normal), origin, direction, &point) == true)
+						if (RayPlaneIntersection(PLANE(tOff.vertices[0], tOff.normal), origin, direction, &point) && PointInTriangle(point, tOff))
 						{
-							if (PointInTriangle(point, tOff) == true)
-							{
-								output->push_back(RaycastHit(PLANE(point, tOff.normal), &o, &t));
-							}
+							output->push_back(RaycastHit(PLANE(point, tOff.normal), &o, &t));
 						}
 					}
 				}
@@ -2420,7 +2414,7 @@ public:
 		//Move object
 		objects.at(0).position = objects.at(0).position + cmde::VEC3F(0.1f, 0, 0) * deltaTime;
 
-		if (myRenderingSystem == true)
+		if (myRenderingSystem)
 		{
 			for (Object& o : objects)
 			{
@@ -2472,7 +2466,7 @@ public:
 	void DrawPallet(short topLeftX, short topLeftY, short bottomRightX, short bottomRightY)
 	{
 		short sizeX = bottomRightX - topLeftX - 1;
-		short offsetX = ceilf(sizeX * 0.20f);
+		short offsetX = (short)ceilf(sizeX * 0.20f);
 		sizeX -= 2 * offsetX;
 		short sizeY = bottomRightY - topLeftY - 1;
 		DrawLine(topLeftX, topLeftY, bottomRightX, topLeftY, 0x0000, 0x2588, -1, -1);
