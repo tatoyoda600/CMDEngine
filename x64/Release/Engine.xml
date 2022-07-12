@@ -4,7 +4,7 @@
         "Engine"
     </assembly>
     <members>
-        <member name="M:Test3D.RaycastAll(cmde.VEC3F,cmde.VEC3F,std.vector&lt;Test3D.Object,std.allocator&lt;Test3D.Object&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;Test3D.RaycastHit,std.allocator&lt;Test3D.RaycastHit&gt;&gt;*)">
+        <member name="M:Test3D.RaycastAll(cmde.VEC3F,cmde.VEC3F,std.vector&lt;Test3D.Object,std.allocator&lt;Test3D.Object&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;Test3D.RaycastHit,std.allocator&lt;Test3D.RaycastHit&gt;&gt;*,std.vector&lt;Test3D.Object**,std.allocator&lt;Test3D.Object**&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
             <summary>
 Casts a ray and detects every plane of the objects with which it intersects
 </summary>
@@ -22,7 +22,7 @@ Casts a ray and detects every plane of the objects with which it intersects
         <member name="M:Test3D.Camera.#ctor">
             <summary>There must be a default constructor or computer gets mad (This should be unusable though)</summary>
         </member>
-        <member name="M:Test3D.RaycastHit.Raycast(cmde.VEC3F,cmde.VEC3F,std.vector&lt;Test3D.Object,std.allocator&lt;Test3D.Object&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+        <member name="M:Test3D.RaycastHit.Raycast(cmde.VEC3F,cmde.VEC3F,std.vector&lt;Test3D.Object,std.allocator&lt;Test3D.Object&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;Test3D.Object**,std.allocator&lt;Test3D.Object**&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
             <summary>
 Casts a ray and detects the first plane of the objects with which it intersects
 </summary>
@@ -90,6 +90,14 @@ Casts a ray and detects the first plane of the objects with which it intersects
         <member name="M:cmde.CMDEngine.Pow2(System.Double)">
             <summary>Elevates a number to the power of 2</summary>
         </member>
+        <member name="M:cmde.CMDEngine.PromptFileSave(cmde.FILE*,System.Char!System.Runtime.CompilerServices.IsConst*,System.Char!System.Runtime.CompilerServices.IsConst*)">
+            <summary>
+Opens a Windows Explorer window, allowing the user to choose the name and location of the file to save to, with the designated file type. Will return true if a file is chosen.
+</summary>
+            <param name="saveFile">The variable to which this function will write the output file to if the user picks a file</param>
+            <param name="fileType">The file type the user will be asked for</param>
+            <param name="fileExtensions">The internal file type info. Must be formatted correctly: L"*.txt;*.jpg;*.png"</param>
+        </member>
         <member name="M:cmde.CMDEngine.PromptFileSearch(cmde.FILE*,System.Char!System.Runtime.CompilerServices.IsConst*,System.Char!System.Runtime.CompilerServices.IsConst*)">
             <summary>
 Opens a Windows Explorer window, allowing the user to choose a file of the designated file type to open. Will return true if a file is chosen.
@@ -147,7 +155,7 @@ Draws a filled in triangle to the command prompt from 3 vertices
             <param name="depth2">How far away from the camera the second vertice is (For rendering things on top of each other) (Negative values are always drawn)</param>
             <param name="depth3">How far away from the camera the third vertice is (For rendering things on top of each other) (Negative values are always drawn)</param>
         </member>
-        <member name="M:cmde.CMDEngine.WriteText(System.Int16,System.Int16,System.Char*,System.Int32,System.Int16,System.Single)">
+        <member name="M:cmde.CMDEngine.WriteText(System.Int16,System.Int16,System.Char*,System.Int16,System.Int16,System.Single)">
             <summary>
 Writes a line of text starting from a point on the command prompt
 </summary>
@@ -200,6 +208,8 @@ Draws a line on the command prompt from a point to another point
             <summary>Draws to a specific point on the command prompt</summary> /// <param name="p">The position of the point (Leftmost is 0; Rightmost is screenSize.X; Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param></member>
         <member name="M:cmde.CMDEngine.Draw(System.Single,System.Single,System.Int16,System.Int16,System.Single)">
             <summary>Draws to a specific point on the command prompt</summary> /// <param name="x">The x position of the point (Leftmost is 0; Rightmost is screenSize.X)</param> /// <param name="y">The y position of the point (Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param></member>
+        <member name="M:cmde.CMDEngine.Draw(System.Int32,System.Int32,System.Int16,System.Int16,System.Single)">
+            <summary>Draws to a specific point on the command prompt</summary> /// <param name="x">The x position of the point (Leftmost is 0; Rightmost is screenSize.X)</param> /// <param name="y">The y position of the point (Topmost is 0; Bottommost is screenSize.Y)</param> /// <param name="col">The color with which to draw to that point (16 available colors (0-F); Must be inputted as Hex 0x0000; The last 2 zeros determine the background and foreground colors respectively (0x00BF))</param> /// <param name="cha">The character with which to draw to that point</param> /// <param name="depth">How far away from the camera the pixel is (For rendering things on top of each other) (Negative values are always drawn)</param></member>
         <member name="M:cmde.CMDEngine.Draw(System.Int16,System.Int16,System.Int16,System.Int16,System.Single)">
             <summary>
 Draws to a specific point on the command prompt
@@ -230,6 +240,12 @@ Constructor for the command prompt engine
         </member>
         <member name="F:cmde.CMDEngine.inputs">
             <summary>0 -&gt; nothing ; 1 -&gt; released ; 2 -&gt; pressed ; 3 -&gt; held ; MOUSE_X and MOUSE_Y -&gt; point on the command prompt</summary>
+        </member>
+        <member name="M:cmde.FILE.HasExtension(System.Char!System.Runtime.CompilerServices.IsConst*)">
+            <summary>
+Compares this file's extension to the one passed to this function
+</summary>
+            <param name="extension">The extension to compare against, without the starting '.' (Ex. 'HasExtension(L"png")')</param>
         </member>
     </members>
 </doc>
