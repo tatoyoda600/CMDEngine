@@ -1291,25 +1291,6 @@ namespace cmde
 		bool ScreenPosDrawnTo(short x, short y)
 		{
 			return OnScreen(x, y) && zBuffer[y * screenSize.X + x] != 1;
-			/*
-			if (OnScreen(x, y) && depth < zBuffer[y * screenSize.X + x])
-			{
-				screen[y * screenSize.X + x].Char.UnicodeChar = cha;
-				screen[y * screenSize.X + x].Attributes = col;
-				zBuffer[y * screenSize.X + x] = depth;
-			}
-
-			for (int i = 0; i < pixelCount; i++)
-			{
-				screen[i] = emptyChar;
-				zBuffer[i] = 1;
-			}
-
-			emptyChar.Char.UnicodeChar = 0x2588;
-			emptyChar.Attributes = 0x0000;
-
-			emptyChar.Attributes = 0x0088;
-			*/
 		}
 
 		short ScreenPosColor(short x, short y)
@@ -1975,7 +1956,7 @@ class Test3D : public cmde::CMDEngine
 
 		cmde::VEC2F ProjectionMatrixify(cmde::VEC3F v)
 		{
-			v.z = -1.0f / (v.z == 0 ? -1 : v.z);
+			v.z = (v.z == 0 ? 1.0f : -1.0f / v.z);
 			return { f1 * v.x * v.z, f2 * v.y * v.z };
 		}
 	};
@@ -2474,7 +2455,7 @@ public:
 		DrawLineS(cmde::VEC2F(0.5f, 0.495f), cmde::VEC2F(0.5f, 0.51f), 0x00FF);
 
 		printLength = swprintf(print, 128, L"Ray Count: %d", Test3D::rayCount);
-		WriteText(0, 15, print, printLength);
+		WriteText(0, 15, print, printLength, 0x000F, -5);
 
 		//Debug UI
 		/*
@@ -2612,35 +2593,30 @@ public:
 	}
 	void Mirrors()
 	{
-		cmde::VEC3F screenCenter = camera.forwards * camera.nearPlane;
-		camera.sightLimitL = Normalize(camera.sightLimitL);
-		camera.sightLimitT = Normalize(camera.sightLimitT);
-		cmde::VEC3F stepX = (screenCenter * 0.5 - (camera.sightLimitL * DotProduct(camera.sightLimitL, screenCenter))) / (camera.screenSize.X * 0.5f);
-		cmde::VEC3F stepY = (screenCenter * 0.5 - (camera.sightLimitT * DotProduct(camera.sightLimitT, screenCenter))) / (camera.screenSize.Y * 0.5f);
-		cmde::VEC3F screenTL = screenCenter + (stepX * camera.screenSize.X * -0.5f) + (stepY * camera.screenSize.Y * -0.5f);
-		RaycastHit hit;
-		cmde::VEC3F temp;
-		cmde::VEC2F temp2;
+		cmde::VEC3F leftStep = camera.left * ((tan(camera.fov.x * 0.5f * RAD) * camera.nearPlane) / (camera.screenSize.X * 0.5f) * -1.0f);
+		cmde::VEC3F upStep = camera.up * (tan(camera.fov.y * 0.5f * RAD) * camera.nearPlane) / (camera.screenSize.Y * 0.5f) * -1.0f;
+		cmde::VEC3F offset = (leftStep * (camera.screenSize.X * 0.5f - 0.5f) - camera.forwards * camera.nearPlane + upStep * (camera.screenSize.Y * 0.5f - 0.5f)) * -1.0f;
+		cmde::VEC3F worldPosX;
 		cmde::VEC3F dir;
-		for (int i = 0; i < camera.screenSize.X; i++)
+		RaycastHit hit;
+		for (int x = 0; x < camera.screenSize.X; x++)
 		{
-			for (int j = 0; j < camera.screenSize.Y; j++)
+			worldPosX = leftStep * x + offset;
+			for (int y = 0; y < camera.screenSize.Y; y++)
 			{
-				dir = screenCenter + (stepX * 2 * (i - (camera.screenSize.X * 0.5f - 0.5f))) + (stepY * 2 * (j - (camera.screenSize.Y * 0.5f - 0.5f)));
-				if (ScreenPosDrawnTo(i, j) && (ScreenPosColor(i, j) & 0x0F00) == 0x0200 && hit.Raycast(camera.position, dir, objects))
+				if (ScreenPosDrawnTo(x, y) && (ScreenPosColor(x, y) & 0x0F00) == 0x0200)
 				{
-					temp = hit.plane.point - camera.position;
-					temp = { DotProduct(temp, camera.left), DotProduct(temp, camera.up), DotProduct(temp, camera.forwards) };
-					temp2 = (camera.ProjectionMatrixify(temp) + cmde::VEC2F(1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
-					temp2.z = (temp.z - camera.nearPlane) * camera.divideFarMinusNear;
-					
-					Draw(temp2, 
-						//if
-						((hit.Raycast(hit.plane.point, dir + hit.plane.normal * -2.0f * DotProduct(dir, hit.plane.normal), objects, *new std::vector<Object*>({ hit.object }))) ? 
-						hit.triangle->color
-						: //else
-						emptyChar.Attributes) 
-					);
+					dir = worldPosX + upStep * y;
+					if (hit.Raycast(camera.position, dir, objects))
+					{
+						Draw(x, y,
+							//if
+							((hit.Raycast(hit.plane.point, dir + hit.plane.normal * -2.0f * DotProduct(dir, hit.plane.normal), objects)) ?
+								hit.triangle->color
+								: //else
+								emptyChar.Attributes)
+						);
+					}
 				}
 			}
 		}
