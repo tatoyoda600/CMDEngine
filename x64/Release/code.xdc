@@ -169,67 +169,67 @@ Opens a Windows Explorer window, allowing the user to choose the name and locati
 <param name="fileType">The file type the user will be asked for</param>
 <param name="fileExtensions">The internal file type info. Must be formatted correctly: L"*.txt;*.jpg;*.png"</param>
 </member>
-<member name="M:cmde.CMDEngine.Pow2(System.Double)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1326">
+<member name="M:cmde.CMDEngine.Pow2(System.Double)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1307">
 <summary>Elevates a number to the power of 2</summary>
 </member>
-<member name="M:cmde.CMDEngine.DotProduct(cmde.VEC4F,cmde.VEC4F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1328">
+<member name="M:cmde.CMDEngine.DotProduct(cmde.VEC4F,cmde.VEC4F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1309">
 <summary>Calculates the dot product of 2 vectors</summary>
 </member>
-<member name="M:cmde.CMDEngine.CrossProduct(cmde.VEC3F,cmde.VEC3F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1330">
+<member name="M:cmde.CMDEngine.CrossProduct(cmde.VEC3F,cmde.VEC3F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1311">
 <summary>Calculates the orthagonal vector of a plane defined by 2 vectors (Index = v1; Middle = v2; Thumb = result)</summary>
 </member>
-<member name="M:cmde.CMDEngine.Magnitude(cmde.VEC4F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1332">
+<member name="M:cmde.CMDEngine.Magnitude(cmde.VEC4F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1313">
 <summary>Calculates the length of a vector</summary>
 </member>
-<member name="M:cmde.CMDEngine.Clamp(System.Single,System.Single,System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1334">
+<member name="M:cmde.CMDEngine.Clamp(System.Single,System.Single,System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1315">
 <summary>Limits 'value' to the range between 'low' and 'high'</summary>
 </member>
-<member name="M:cmde.CMDEngine.Sign(System.Int32)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1336">
+<member name="M:cmde.CMDEngine.Sign(System.Int32)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1317">
 <summary>Gives the sign of a value (Positive = 1; Negative = -1; Other = itself)</summary>
 </member>
-<member name="M:cmde.CMDEngine.Sign(System.Double)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1338">
+<member name="M:cmde.CMDEngine.Sign(System.Double)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1319">
 <summary>Gives the sign of a value (Positive = 1; Negative = -1; Other = itself)</summary>
 </member>
-<member name="M:cmde.CMDEngine.Angle(cmde.VEC4F,cmde.VEC4F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1340">
+<member name="M:cmde.CMDEngine.Angle(cmde.VEC4F,cmde.VEC4F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1321">
 <summary>Calculates the angle between 2 vectors in degrees</summary>
 </member>
-<member name="M:cmde.CMDEngine.Normalize(cmde.VEC4F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1342">
+<member name="M:cmde.CMDEngine.Normalize(cmde.VEC4F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1323">
 <summary>Gives a vector of length 1 in the same direction</summary>
 </member>
-<member name="M:cmde.CMDEngine.LinearFunction(System.Single,System.Single,System.Single,System.Single,System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1346">
+<member name="M:cmde.CMDEngine.LinearFunction(System.Single,System.Single,System.Single,System.Single,System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1327">
 <summary>Calculates the y value of point x on the line defined by the 2 points provided (Returns y1 if x1 == x2)</summary>
 </member>
-<member name="M:cmde.CMDEngine.LinearFunction(cmde.VEC4F,cmde.VEC4F,System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1353">
+<member name="M:cmde.CMDEngine.LinearFunction(cmde.VEC4F,cmde.VEC4F,System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1334">
 <summary>Calculates the point at 'x' on the line defined by the 2 points provided (Returns p1 if p1.x == p2.x)</summary>
 </member>
-<member name="M:cmde.CMDEngine.LinearFunction(System.Single,System.Single,System.Single,System.Single,System.Single,System.Single*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1361">
+<member name="M:cmde.CMDEngine.LinearFunction(System.Single,System.Single,System.Single,System.Single,System.Single,System.Single*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1342">
 <summary>Calculates the y value of point x on the line defined by the 2 points provided and inserts it into 'output' (Returns false if x1 == x2)</summary>
 </member>
-<member name="M:cmde.CMDEngine.LinearFunction(cmde.VEC4F,cmde.VEC4F,System.Single,cmde.VEC4F*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1363">
+<member name="M:cmde.CMDEngine.LinearFunction(cmde.VEC4F,cmde.VEC4F,System.Single,cmde.VEC4F*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1344">
 <summary>Calculates the point at 'x' on the line defined by the 2 points provided and inserts it into 'output' (Returns false if p1.x == p2.x)</summary>
 </member>
-<member name="M:cmde.CMDEngine.LinearFunction(System.Single,System.Single,System.Single,System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1365">
+<member name="M:cmde.CMDEngine.LinearFunction(System.Single,System.Single,System.Single,System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1346">
 <summary>Generates the linear function based on 'x' defined by the 2 points provided (Returns y=0 if x1 == x2)</summary>
 </member>
-<member name="M:cmde.CMDEngine.LinearFunction(cmde.VEC4F,cmde.VEC4F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1372">
+<member name="M:cmde.CMDEngine.LinearFunction(cmde.VEC4F,cmde.VEC4F)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1353">
 <summary>Generates the linear function based on 'x' defined by the 2 points provided (Returns y=z=w=0 if p1.x == p2.x)</summary>
 </member>
-<member name="M:cmde.CMDEngine.LinearFunction(System.Single,System.Single,System.Single,System.Single,cmde.LINEAR*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1381">
+<member name="M:cmde.CMDEngine.LinearFunction(System.Single,System.Single,System.Single,System.Single,cmde.LINEAR*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1362">
 <summary>Generates the linear function based on 'x' defined by the 2 points provided and inserts it into 'output' (Returns false if x1 == x2)</summary>
 </member>
-<member name="M:cmde.CMDEngine.LinearFunction(cmde.VEC4F,cmde.VEC4F,cmde.LINEAR*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1383">
+<member name="M:cmde.CMDEngine.LinearFunction(cmde.VEC4F,cmde.VEC4F,cmde.LINEAR*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1364">
 <summary>Generates the linear function based on 'x' defined by the 2 points provided and inserts it into 'output' (Returns false if p1.x == p2.x)</summary>
 </member>
-<member name="M:cmde.CMDEngine.QuadraticFunction(cmde.VEC2F,cmde.VEC2F,cmde.VEC2F,System.Single,cmde.VEC2F*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1387">
+<member name="M:cmde.CMDEngine.QuadraticFunction(cmde.VEC2F,cmde.VEC2F,cmde.VEC2F,System.Single,cmde.VEC2F*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1368">
 <summary>Calculates the point at 'x' on the line defined by the 3 points provided and inserts it into 'output' (Returns false if there is any repeat value in p1.x, p2.x, and p3.x)</summary>
 </member>
-<member name="M:cmde.CMDEngine.QuadraticFunction(cmde.VEC4F,cmde.VEC4F,cmde.VEC4F,cmde.QUADRATIC*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1405">
+<member name="M:cmde.CMDEngine.QuadraticFunction(cmde.VEC4F,cmde.VEC4F,cmde.VEC4F,cmde.QUADRATIC*)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1386">
 <summary>Generates the quadratic function based on 'x' defined by the 3 points provided and inserts it into 'output' (Returns false if there is any repeat value in p1.x, p2.x, and p3.x)</summary>
 </member>
-<member name="M:cmde.CMDEngine.VectorFromAngles(System.Single,System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1424">
+<member name="M:cmde.CMDEngine.VectorFromAngles(System.Single,System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1405">
 <summary>Assumes the XYZ axis are set up correctly (X+ is left when Z+ is forwards and Y+ is up)</summary>
 </member>
-<member name="M:Test3D.RaycastHit.Raycast(cmde.VEC3F,cmde.VEC3F,std.vector&lt;Test3D.Object,std.allocator&lt;Test3D.Object&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;Test3D.Object**,std.allocator&lt;Test3D.Object**&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1798">
+<member name="M:Test3D.RaycastHit.Raycast(cmde.VEC3F,cmde.VEC3F,std.vector&lt;Test3D.Object,std.allocator&lt;Test3D.Object&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;Test3D.Object**,std.allocator&lt;Test3D.Object**&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1779">
 <summary>
 Casts a ray and detects the first plane of the objects with which it intersects
 </summary>
@@ -237,16 +237,16 @@ Casts a ray and detects the first plane of the objects with which it intersects
 <param name="direction">The direction the ray goes</param>
 <param name="objects">The objects to test against</param>
 </member>
-<member name="M:Test3D.Camera.#ctor" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1846">
+<member name="M:Test3D.Camera.#ctor" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1827">
 <summary>There must be a default constructor or computer gets mad (This should be unusable though)</summary>
 </member>
-<member name="M:Test3D.DepthConversion(System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2087">
+<member name="M:Test3D.DepthConversion(System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2068">
 <summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one</summary>
 </member>
-<member name="M:Test3D.DenormalizeDepth(System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2089">
+<member name="M:Test3D.DenormalizeDepth(System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2070">
 <summary>Takes a relative depth value where 0 is the near plane and 1 is the far plane, and returns an actual depth value</summary>
 </member>
-<member name="M:Test3D.RaycastAll(cmde.VEC3F,cmde.VEC3F,std.vector&lt;Test3D.Object,std.allocator&lt;Test3D.Object&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;Test3D.RaycastHit,std.allocator&lt;Test3D.RaycastHit&gt;&gt;*,std.vector&lt;Test3D.Object**,std.allocator&lt;Test3D.Object**&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2092">
+<member name="M:Test3D.RaycastAll(cmde.VEC3F,cmde.VEC3F,std.vector&lt;Test3D.Object,std.allocator&lt;Test3D.Object&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;Test3D.RaycastHit,std.allocator&lt;Test3D.RaycastHit&gt;&gt;*,std.vector&lt;Test3D.Object**,std.allocator&lt;Test3D.Object**&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2073">
 <summary>
 Casts a ray and detects every plane of the objects with which it intersects
 </summary>
