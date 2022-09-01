@@ -237,16 +237,24 @@ Casts a ray and detects the first plane of the objects with which it intersects
 <param name="direction">The direction the ray goes</param>
 <param name="objects">The objects to test against</param>
 </member>
-<member name="M:Test3D.Camera.#ctor" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1827">
+<member name="M:Test3D.RaycastHit.Raycast(cmde.VEC3F,cmde.VEC3F,Test3D.Object*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1806">
+<summary>
+Casts a ray and detects the first plane of the objects with which it intersects
+</summary>
+<param name="origin">The point from ray starts at</param>
+<param name="direction">The direction the ray goes</param>
+<param name="objects">The objects to test against</param>
+</member>
+<member name="M:Test3D.Camera.#ctor" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="1875">
 <summary>There must be a default constructor or computer gets mad (This should be unusable though)</summary>
 </member>
-<member name="M:Test3D.DepthConversion(System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2068">
+<member name="M:Test3D.DepthConversion(System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2116">
 <summary>A lot of projection matrices output depth in a weird format, which differs from the one used in this program. This function converts depth from the linear type used in this program to that weird one</summary>
 </member>
-<member name="M:Test3D.DenormalizeDepth(System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2070">
+<member name="M:Test3D.DenormalizeDepth(System.Single)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2118">
 <summary>Takes a relative depth value where 0 is the near plane and 1 is the far plane, and returns an actual depth value</summary>
 </member>
-<member name="M:Test3D.RaycastAll(cmde.VEC3F,cmde.VEC3F,std.vector&lt;Test3D.Object,std.allocator&lt;Test3D.Object&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;Test3D.RaycastHit,std.allocator&lt;Test3D.RaycastHit&gt;&gt;*,std.vector&lt;Test3D.Object**,std.allocator&lt;Test3D.Object**&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2073">
+<member name="M:Test3D.RaycastAll(cmde.VEC3F,cmde.VEC3F,std.vector&lt;Test3D.Object,std.allocator&lt;Test3D.Object&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;Test3D.RaycastHit,std.allocator&lt;Test3D.RaycastHit&gt;&gt;*,std.vector&lt;Test3D.Object**,std.allocator&lt;Test3D.Object**&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)" decl="false" source="C:\Users\tatoy\source\repos\Engine\code.cpp" line="2121">
 <summary>
 Casts a ray and detects every plane of the objects with which it intersects
 </summary>

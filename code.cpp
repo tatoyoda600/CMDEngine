@@ -1776,17 +1776,65 @@ class Test3D : public cmde::CMDEngine
 
 		RaycastHit(PLANE p, Object* o, Triangle* t) { plane = p; object = o; triangle = t; }
 
-						/// <summary>
-						/// Casts a ray and detects the first plane of the objects with which it intersects
-						/// </summary>
-						/// <param name="origin">The point from ray starts at</param>
-						/// <param name="direction">The direction the ray goes</param>
-						/// <param name="objects">The objects to test against</param>
+		/// <summary>
+		/// Casts a ray and detects the first plane of the objects with which it intersects
+		/// </summary>
+		/// <param name="origin">The point from ray starts at</param>
+		/// <param name="direction">The direction the ray goes</param>
+		/// <param name="objects">The objects to test against</param>
 		bool Raycast(cmde::VEC3F origin, cmde::VEC3F direction, std::vector<Object>& objects, std::vector<Object*>& ignore = *new std::vector<Object*>())
 		{
 			Test3D::rayCount++;
 			std::vector<RaycastHit> hits = std::vector<RaycastHit>();
 			RaycastAll(origin, direction, objects, &hits, ignore);
+			float distance = -1;
+			for (RaycastHit& p : hits)
+			{
+				float tempDist = Magnitude(p.plane.point - origin);
+				if (tempDist < distance || distance < 0)
+				{
+					distance = tempDist;
+
+					plane = p.plane;
+					object = p.object;
+					triangle = p.triangle;
+				}
+			}
+			return hits.size() > 0;
+		}
+
+		/// <summary>
+		/// Casts a ray and detects the first plane of the objects with which it intersects
+		/// </summary>
+		/// <param name="origin">The point from ray starts at</param>
+		/// <param name="direction">The direction the ray goes</param>
+		/// <param name="objects">The objects to test against</param>
+		bool Raycast(cmde::VEC3F origin, cmde::VEC3F direction, Object& obj)
+		{
+			Test3D::rayCount++;
+			std::vector<RaycastHit> hits = std::vector<RaycastHit>();
+
+			direction = Normalize(direction);
+			cmde::VEC3F nearest;
+			Triangle tOff = { cmde::VEC3F(), cmde::VEC3F(), cmde::VEC3F() };
+			cmde::VEC3F point = cmde::VEC3F();
+			nearest = origin + direction * DotProduct(obj.position - origin, direction) - obj.position;
+			if (Pow2(obj.mesh.radius) >= DotProduct(nearest, nearest))
+			{
+				//Ray passes through this object's bounding sphere (Could possibly collide)
+				for (Triangle& t : obj.mesh.triangles)
+				{
+					if (DotProduct(t.normal, direction) > 0)
+					{
+						tOff = Triangle(t.vertices[0] + obj.position, t.vertices[1] + obj.position, t.vertices[2] + obj.position);
+						if (RayPlaneIntersection(PLANE(tOff.vertices[0], tOff.normal), origin, direction, &point) && PointInTriangle(point, tOff))
+						{
+							hits.push_back(RaycastHit(PLANE(point, tOff.normal), &obj, &t));
+						}
+					}
+				}
+			}
+
 			float distance = -1;
 			for (RaycastHit& p : hits)
 			{
@@ -2086,7 +2134,7 @@ class Test3D : public cmde::CMDEngine
 		cmde::VEC3F point = cmde::VEC3F();
 		for (Object& o : objects)
 		{
-			if (std::find(ignore.begin(), ignore.end(), &o) != ignore.end())
+			if (ignore.size() > 0 && std::find(ignore.begin(), ignore.end(), &o) != ignore.end())
 			{
 				continue;
 			}
@@ -2593,6 +2641,21 @@ public:
 	}
 	void Mirrors()
 	{
+		std::vector<Triangle> mirrorPolygons = std::vector<Triangle>();
+		for (Object& o : objects)
+		{
+			for (Triangle& t : o.mesh.triangles)
+			{
+				Triangle t2 = t.GetWithOffset(o.position);
+				if ((t.color & 0x0F00) == 0x0200 && DotProduct(CrossProduct(t2.vertices[1] - t2.vertices[0], t2.vertices[2] - t2.vertices[0]), t2.vertices[0] - camera.position) < 0)
+				{
+					//Triangle is a mirror and is facing the camera
+					mirrorPolygons.push_back(t.GetWithOffset(o.position));
+				}
+			}
+		}
+		Object mirrors = Object(*new Mesh(mirrorPolygons));
+
 		cmde::VEC3F leftStep = camera.left * ((tan(camera.fov.x * 0.5f * RAD) * camera.nearPlane) / (camera.screenSize.X * 0.5f) * -1.0f);
 		cmde::VEC3F upStep = camera.up * (tan(camera.fov.y * 0.5f * RAD) * camera.nearPlane) / (camera.screenSize.Y * 0.5f) * -1.0f;
 		cmde::VEC3F offset = (leftStep * (camera.screenSize.X * 0.5f - 0.5f) - camera.forwards * camera.nearPlane + upStep * (camera.screenSize.Y * 0.5f - 0.5f)) * -1.0f;
@@ -2607,7 +2670,7 @@ public:
 				if (ScreenPosDrawnTo(x, y) && (ScreenPosColor(x, y) & 0x0F00) == 0x0200)
 				{
 					dir = worldPosX + upStep * y;
-					if (hit.Raycast(camera.position, dir, objects))
+					if (hit.Raycast(camera.position, dir, mirrors))
 					{
 						Draw(x, y,
 							//if

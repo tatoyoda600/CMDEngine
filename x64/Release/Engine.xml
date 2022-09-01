@@ -22,6 +22,14 @@ Casts a ray and detects every plane of the objects with which it intersects
         <member name="M:Test3D.Camera.#ctor">
             <summary>There must be a default constructor or computer gets mad (This should be unusable though)</summary>
         </member>
+        <member name="M:Test3D.RaycastHit.Raycast(cmde.VEC3F,cmde.VEC3F,Test3D.Object*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
+            <summary>
+Casts a ray and detects the first plane of the objects with which it intersects
+</summary>
+            <param name="origin">The point from ray starts at</param>
+            <param name="direction">The direction the ray goes</param>
+            <param name="objects">The objects to test against</param>
+        </member>
         <member name="M:Test3D.RaycastHit.Raycast(cmde.VEC3F,cmde.VEC3F,std.vector&lt;Test3D.Object,std.allocator&lt;Test3D.Object&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced,std.vector&lt;Test3D.Object**,std.allocator&lt;Test3D.Object**&gt;&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
             <summary>
 Casts a ray and detects the first plane of the objects with which it intersects
