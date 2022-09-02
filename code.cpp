@@ -1486,7 +1486,8 @@ class Test3D : public cmde::CMDEngine
 			visibleSides[1] = true;
 			visibleSides[2] = true;
 			color = col;
-			normal = Normalize(CrossProduct(vertices[0] - vertices[1], vertices[2] - vertices[1]));
+			//normal = Normalize(CrossProduct(vertices[0] - vertices[1], vertices[2] - vertices[1]));
+			normal = Normalize(CrossProduct(vertices[1] - vertices[0], vertices[2] - vertices[0]));
 		}
 
 		Triangle(cmde::VEC3F p1, cmde::VEC3F p2, cmde::VEC3F p3, short col, bool s1, bool s2, bool s3)
@@ -1498,7 +1499,8 @@ class Test3D : public cmde::CMDEngine
 			visibleSides[1] = s2;
 			visibleSides[2] = s3;
 			color = col;
-			normal = Normalize(CrossProduct(vertices[0] - vertices[1], vertices[2] - vertices[1]));
+			//normal = Normalize(CrossProduct(vertices[0] - vertices[1], vertices[2] - vertices[1]));
+			normal = Normalize(CrossProduct(vertices[1] - vertices[0], vertices[2] - vertices[0]));
 		}
 
 		Triangle GetWithOffset(cmde::VEC3F offset)
@@ -1771,6 +1773,7 @@ class Test3D : public cmde::CMDEngine
 		PLANE plane;
 		Object* object;
 		Triangle* triangle;
+		wchar_t error[128];
 
 		RaycastHit() { object = new Object(); triangle = new Triangle({ cmde::VEC3F(), cmde::VEC3F(), cmde::VEC3F() }); }
 
@@ -1824,7 +1827,7 @@ class Test3D : public cmde::CMDEngine
 				//Ray passes through this object's bounding sphere (Could possibly collide)
 				for (Triangle& t : obj.mesh.triangles)
 				{
-					if (DotProduct(t.normal, direction) > 0)
+					if (DotProduct(t.normal, direction) < 0)
 					{
 						tOff = Triangle(t.vertices[0] + obj.position, t.vertices[1] + obj.position, t.vertices[2] + obj.position);
 						if (RayPlaneIntersection(PLANE(tOff.vertices[0], tOff.normal), origin, direction, &point) && PointInTriangle(point, tOff))
@@ -1871,6 +1874,7 @@ class Test3D : public cmde::CMDEngine
 		float aspectRatio;
 		float f1;
 		float f2;
+		//static std::vector<cmde::VEC3F> mirrorPoints;
 
 						///<summary>There must be a default constructor or computer gets mad (This should be unusable though)</summary>
 		Camera()
@@ -1959,7 +1963,7 @@ class Test3D : public cmde::CMDEngine
 			cmde::VEC3F vertices[3];
 			for (Triangle &t : newTriangles)
 			{
-				if (DotProduct(CrossProduct(t.vertices[1] - t.vertices[0], t.vertices[2] - t.vertices[0]), t.vertices[0] - position) >= 0)
+				if (DotProduct(t.normal, t.vertices[0] - position) >= 0)
 				{
 					//Backface culling (This isn't a TODO, skipping the triangle like this is the backface culling)
 					continue;
@@ -2023,9 +2027,9 @@ class Test3D : public cmde::CMDEngine
 
 	static bool PointInTriangle(cmde::VEC3F point, Triangle& triangle)
 	{
-		return (DotProduct(point - triangle.vertices[0], CrossProduct(triangle.vertices[2] - triangle.vertices[0], triangle.normal)) < 0) &&
-			(DotProduct(point - triangle.vertices[1], CrossProduct(triangle.vertices[0] - triangle.vertices[1], triangle.normal)) < 0) &&
-			(DotProduct(point - triangle.vertices[2], CrossProduct(triangle.vertices[1] - triangle.vertices[2], triangle.normal)) < 0);
+		return (DotProduct(point - triangle.vertices[0], CrossProduct(triangle.vertices[2] - triangle.vertices[0], triangle.normal)) > 0) &&
+			(DotProduct(point - triangle.vertices[1], CrossProduct(triangle.vertices[0] - triangle.vertices[1], triangle.normal)) > 0) &&
+			(DotProduct(point - triangle.vertices[2], CrossProduct(triangle.vertices[1] - triangle.vertices[2], triangle.normal)) > 0);
 	}
 
 	static std::vector<Triangle> ClipTriangles(Object& obj, cmde::VEC3F cameraPos, PLANE inBounds[6])
@@ -2127,6 +2131,7 @@ class Test3D : public cmde::CMDEngine
 					/// <param name="output">The vector in which to store the data of every hit</param>
 	static bool RaycastAll(cmde::VEC3F origin, cmde::VEC3F direction, std::vector<Object>& objects, std::vector<RaycastHit>* output, std::vector<Object*>& ignore = *new std::vector<Object*>())
 	{
+		//Camera::mirrorPoints.clear();
 		direction = Normalize(direction);
 		cmde::VEC3F dirDiv = { 1.0f / direction.x, 1.0f / direction.y, 1.0f / direction.z };
 		cmde::VEC3F t1, t2, nearest;
@@ -2149,11 +2154,12 @@ class Test3D : public cmde::CMDEngine
 					//Ray passes through this object's axis aligned bounding box (Could possibly collide)
 					for (Triangle& t : o.mesh.triangles)
 					{
-						if (DotProduct(t.normal, direction) > 0)
+						if (DotProduct(t.normal, direction) < 0)
 						{
 							tOff = Triangle(t.vertices[0] + o.position, t.vertices[1] + o.position, t.vertices[2] + o.position);
 							if (RayPlaneIntersection(PLANE(tOff.vertices[0], tOff.normal), origin, direction, &point) && PointInTriangle(point, tOff))
 							{
+								//Camera::mirrorPoints.push_back(point);
 								output->push_back(RaycastHit(PLANE(point, tOff.normal), &o, &t));
 							}
 						}
@@ -2443,7 +2449,8 @@ public:
 		*/
 
 		obj1 = Object(cube1, cmde::VEC3F(0, 0, 0));
-		obj1.mesh.ChangeColor(0x02AA);
+		obj1.mesh.ChangeColor(0x00AA);
+		obj1.mesh.triangles.at(9).color = 0x02CC;
 		objects.push_back(obj1);
 		obj2 = Object(cube1, cmde::VEC3F(0, 1, 0));
 		obj2.mesh.ChangeColor(0x00BB);
@@ -2672,6 +2679,7 @@ public:
 					dir = worldPosX + upStep * y;
 					if (hit.Raycast(camera.position, dir, mirrors))
 					{
+						
 						Draw(x, y,
 							//if
 							((hit.Raycast(hit.plane.point, dir + hit.plane.normal * -2.0f * DotProduct(dir, hit.plane.normal), objects)) ?
@@ -2679,6 +2687,25 @@ public:
 								: //else
 								emptyChar.Attributes)
 						);
+
+						/*
+						for (cmde::VEC3F v : Camera::points)
+						{
+							cmde::VEC3F temp = v - camera.position;
+							temp = { DotProduct(temp, camera.left), DotProduct(temp, camera.up), DotProduct(temp, camera.forwards) };
+							cmde::VEC2F screenPos = (camera.ProjectionMatrixify(temp) + cmde::VEC2F(1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
+							Draw(screenPos, 0x0033, 0x2588, -5);
+						}
+						cmde::VEC3F temp = hit.plane.point - camera.position;
+						temp = { DotProduct(temp, camera.left), DotProduct(temp, camera.up), DotProduct(temp, camera.forwards) };
+						cmde::VEC2F screenPos = (camera.ProjectionMatrixify(temp) + cmde::VEC2F(1, 1)) * 0.5f * cmde::VEC2F(screenSize.X, screenSize.Y);
+						Draw(screenPos, 0x0033, 0x2588, -5);
+						wchar_t print[128] = {};
+						swprintf(print, 128, L"Point: (%f;%f;%f)", hit.plane.point.x, hit.plane.point.y, hit.plane.point.z);
+						WriteText(0, 20, print, 41);
+						swprintf(print, 128, L"screenPos: (%f;%f)", screenPos.x, screenPos.y);
+						WriteText(0, 21, print, 41);
+						*/
 					}
 				}
 			}
@@ -2687,6 +2714,7 @@ public:
 };
 
 int Test3D::rayCount = 0;
+//std::vector<cmde::VEC3F> Test3D::Camera::mirrorPoints = std::vector<cmde::VEC3F>();
 
 int main()
 {
